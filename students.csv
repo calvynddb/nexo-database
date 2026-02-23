@@ -1,5 +1,5 @@
 id,firstname,lastname,program,year,gender
-2021-0001,Carla,Lim,BSMETE,4,Female
+2021-0001,Carla,Lim,BSBio-Micro,4,Female
 2021-0002,Hernando,Mercado,BSMETE,4,Male
 2021-0003,Jomar,Gonzales,BSMETE,4,Male
 2021-0004,Stephanie,Santiago,BSMETE,4,Female
@@ -10881,4 +10881,4 @@ id,firstname,lastname,program,year,gender
 2024-2748,Alfredo,Lim,BSCA,1,Male
 2024-2749,Andrei,Villanueva,BSCA,1,Male
 2024-2750,Rowena,Cruz,BSCA,1,Female
-122222222,KALBO,ADOBO,BSCA,1,Female
+2024-8975,Michael,Novela,BSCS,1,Male
