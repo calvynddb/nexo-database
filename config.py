@@ -6,25 +6,26 @@ import customtkinter as ctk
 
 # --- Theme Setup ---
 ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("dark-blue")
+ctk.set_default_color_theme("dark-blue")  # Using dark-blue theme, but will override blue colors in code
 
 # --- Fonts ---
-# Uses Inter/Montserrat (sleek modern fonts); falls back to system fonts if unavailable
-FONT_MAIN = ("Montserrat", 13)
-FONT_BOLD = ("Montserrat", 13, "bold")
-FONT_FAMILY = "Montserrat"
+# Century Gothic - clean, modern font for professional look
+FONT_MAIN = ("Century Gothic", 13)
+FONT_BOLD = ("Century Gothic", 13, "bold")
+FONT_FAMILY = "Century Gothic"
 
 def get_font(size: int = 13, bold: bool = False):
     """Return a font tuple for widgets: (family, size[, 'bold'])."""
     return (FONT_FAMILY, size, "bold") if bold else (FONT_FAMILY, size)
 
-# --- Colors --- Modern Dark Purple Theme (sophisticated, muted tones)
-BG_COLOR = "#0a0a15"  # Very dark background (almost black with purple tint)
-PANEL_COLOR = "#0f0b1f"  # Dark card background (even darker for subdued look)
-ACCENT_COLOR = "#6d28d9"  # Muted purple/indigo (primary accent, less vibrant)
-TEXT_MUTED = "#9090a8"  # Muted gray-blue
-TEXT_PRIMARY = "#e5e5f0"  # Softer off-white for main text
-BORDER_COLOR = "#5b21b6"  # Darker purple border
+# --- Colors --- Subtle Dark Purple Theme with Purple Accents
+BG_COLOR = "#0d0d12"  # Very dark background (nearly black)
+PANEL_COLOR = "#1a1620"  # Dark card background (subtle warm undertone)
+ACCENT_COLOR = "#5a4a7a"  # Subtle muted purple (primary accent)
+TEXT_MUTED = "#8a8a95"  # Muted gray-blue (darker for readability)
+TEXT_PRIMARY = "#e8e8f0"  # Soft off-white for main text
+BORDER_COLOR = "#2a1f35"  # Subtle purple border for definition
+PANEL_SELECTED = "#2d1f45"  # Subtle purple selection highlight
 
 # --- CSV Files and Fields ---
 FILES = {
@@ -43,16 +44,16 @@ FIELDS = {
 WINDOW_WIDTH = 1400
 WINDOW_HEIGHT = 900
 
-# --- Chart Colors --- Muted purple & indigo palette
+# --- Chart Colors --- Subtle Purple Palette
 COLOR_PALETTE = [
-    '#6d28d9',  # Muted purple (primary)
-    '#7c3aed',  # Indigo
-    '#8b5cf6',  # Medium purple
-    '#5b21b6',  # Deep purple
-    '#4c1d95',  # Very deep purple
-    '#06b6d4',  # Cyan (subtle complement)
-    '#6366f1',  # Indigo (deep blue)
-    '#10b981'   # Emerald (fresh, less vibrant)
+    '#5a4a7a',  # Subtle muted purple (primary)
+    '#6d5a8a',  # Muted purple-gray
+    '#7a6a95',  # Medium muted purple
+    '#4a3a65',  # Deep subtle purple
+    '#3a2a50',  # Very deep purple
+    '#5a7a8a',  # Muted blue-gray
+    '#6a7a8a',  # Muted slate
+    '#5a8a7a'   # Muted teal (subtle cool tone)
 ]
 
 # --- Global Theme Manager ---

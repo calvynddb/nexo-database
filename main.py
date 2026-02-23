@@ -16,7 +16,7 @@ class App(ctk.CTk):
     
     def __init__(self):
         super().__init__()
-        self.title("EduManage SIS")
+        self.title("nexo")
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
         
         # Initialize data files
@@ -53,15 +53,79 @@ class App(ctk.CTk):
         for F in (LoginFrame, DashboardFrame):
             frame = F(self.container, self)
             self.frames[F] = frame
-            frame.grid(row=0, column=0, sticky="nsew")
+            # use place so we can animate sliding transitions between frames
+            frame.place(relx=0, rely=0, relwidth=1, relheight=1)
 
-        # Show login frame first
-        self.show_frame(LoginFrame)
+        # Show login frame first (without fade animation)
+        self.current_frame = None
+        self.show_frame(LoginFrame, fade=False)
 
-    def show_frame(self, cont):
+    def show_frame(self, cont, fade=True):
         """Show a specific frame."""
-        frame = self.frames[cont]
-        frame.tkraise()
+        new_frame = self.frames[cont]
+        old_frame = getattr(self, 'current_frame', None)
+        if old_frame is new_frame:
+            return
+
+        # fast window fade (alpha) transition: fade out, swap frames, fade in
+        if not fade:
+            # Skip fade animation on launch
+            new_frame.lift()
+            self.current_frame = new_frame
+            from ui.utils import apply_button_hover
+            try:
+                apply_button_hover(new_frame)
+            except Exception:
+                pass
+            return
+        
+        try:
+            steps = max(3, int(180 // 15))
+            def fade_out(i=0):
+                a = 1.0 - (i / steps)
+                try:
+                    self.attributes('-alpha', max(0.0, a))
+                except Exception:
+                    pass
+                if i < steps:
+                    self.after(15, lambda: fade_out(i+1))
+                else:
+                    # swap frames while invisible
+                    try:
+                        new_frame.lift()
+                        self.current_frame = new_frame
+                        from ui.utils import apply_button_hover
+                        try:
+                            apply_button_hover(new_frame)
+                        except Exception:
+                            pass
+                    except Exception:
+                        pass
+                    fade_in(0)
+
+            def fade_in(i=0):
+                a = (i / steps)
+                try:
+                    self.attributes('-alpha', min(1.0, a))
+                except Exception:
+                    pass
+                if i < steps:
+                    self.after(15, lambda: fade_in(i+1))
+
+            fade_out(0)
+        except Exception:
+            # fallback to instant raise
+            new_frame.tkraise()
+            try:
+                from ui.utils import apply_button_hover
+                apply_button_hover(new_frame)
+            except Exception:
+                pass
+            self.current_frame = new_frame
+
+
+def _lerp(a, b, t):
+    return a + (b - a) * t
 
 
 def main():

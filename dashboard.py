@@ -101,7 +101,7 @@ class DashboardFrame(ctk.CTkFrame):
         
         self.add_btn = ctk.CTkButton(left_inner, text="Add Entry", width=120, height=40,
                         font=get_font(12, True),
-                                    fg_color=ACCENT_COLOR, text_color="black",
+                                    fg_color=ACCENT_COLOR, text_color="white",
                         hover_color="#7C3AED", command=self.handle_add_entry)
         self.add_btn.grid(row=0, column=1, sticky="e", padx=(15, 0))
         
@@ -201,7 +201,7 @@ class DashboardFrame(ctk.CTkFrame):
         # Update active tab styling
         for vc, btn in self.nav_btns.items():
             if vc == view_class:
-                btn.configure(fg_color=ACCENT_COLOR, text_color="black")
+                btn.configure(fg_color=ACCENT_COLOR, text_color="white")
             else:
                 btn.configure(fg_color="transparent", text_color="#d1d1d1")
         
