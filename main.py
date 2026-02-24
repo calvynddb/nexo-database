@@ -3,7 +3,7 @@ Main entry point for nexo SIS application.
 """
 
 import customtkinter as ctk
-from config import BG_COLOR, WINDOW_WIDTH, WINDOW_HEIGHT
+from config import BG_COLOR, WINDOW_WIDTH, WINDOW_HEIGHT, resource_path
 from backend import init_files, load_csv
 from frontend_ui.auth import LoginFrame
 from frontend_ui.dashboard import DashboardFrame
@@ -17,6 +17,10 @@ class App(ctk.CTk):
         super().__init__()
         self.title("nexo")
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
+        try:
+            self.iconbitmap(resource_path("assets/nexo.ico"))
+        except Exception:
+            pass
         self.logged_in = False
         self._load_data()
         self._build_frames()
