@@ -166,10 +166,12 @@ class ProgramsView(ctk.CTkFrame):
 
     def create_donut_chart(self, parent):
         try:
+            import matplotlib
+            matplotlib.use('TkAgg')
             import matplotlib.pyplot as plt
             from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-        except ImportError:
-            ctk.CTkLabel(parent, text="Matplotlib required", text_color=TEXT_MUTED).pack(pady=40)
+        except Exception:
+            ctk.CTkLabel(parent, text="Chart unavailable", text_color=TEXT_MUTED).pack(pady=40)
             return
         
         fig, ax = plt.subplots(figsize=(2.5, 2.5), dpi=100)
@@ -200,7 +202,6 @@ class ProgramsView(ctk.CTkFrame):
                                    wedgeprops=dict(width=0.4, edgecolor=PANEL_COLOR, linewidth=2))
             ax.axis('equal')
 
-            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
             canvas = FigureCanvasTkAgg(fig, master=parent)
             canvas.draw()
             canvas.get_tk_widget().pack(pady=(6, 2))

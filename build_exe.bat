@@ -1,8 +1,9 @@
 @echo off
 REM Build a single-file, windowed executable using PyInstaller
 REM Bundles all source code, assets, CSV seed data, and dependencies.
+REM Uses Python 3.13 directly to avoid NumPy/matplotlib DLL incompatibilities with Python 3.14+
 
-pyinstaller --noconfirm --onefile --windowed ^
+C:\Users\Calvyn\AppData\Local\Programs\Python\Python313\python.exe -m PyInstaller --noconfirm --onefile --windowed ^
     --icon "assets/nexo.ico" ^
     --add-data "assets;assets" ^
     --add-data "config.py;." ^
@@ -14,11 +15,10 @@ pyinstaller --noconfirm --onefile --windowed ^
     --add-data "frontend_ui;frontend_ui" ^
     --hidden-import "PIL" ^
     --hidden-import "PIL._tkinter_finder" ^
-    --hidden-import "matplotlib" ^
-    --hidden-import "matplotlib.backends.backend_tkagg" ^
     --hidden-import "numpy" ^
     --hidden-import "customtkinter" ^
     --collect-all "customtkinter" ^
+    --collect-all "matplotlib" ^
     --exclude-module "PyQt5" ^
     --exclude-module "PyQt6" ^
     --exclude-module "PySide2" ^
@@ -27,7 +27,6 @@ pyinstaller --noconfirm --onefile --windowed ^
     --exclude-module "pandas" ^
     --exclude-module "pytest" ^
     --exclude-module "setuptools" ^
-    --exclude-module "unittest" ^
     --name nexo ^
     main.py
 

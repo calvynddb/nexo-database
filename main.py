@@ -2,6 +2,18 @@
 Main entry point for nexo SIS application.
 """
 
+import os
+import sys
+import tempfile
+
+# matplotlib needs a writable config/cache dir — critical inside a frozen PyInstaller exe
+# where _MEIPASS is read-only. Point it to a persistent temp folder before any import.
+if getattr(sys, 'frozen', False):
+    _mpl_dir = os.path.join(tempfile.gettempdir(), 'nexo_mpl_cache')
+    os.makedirs(_mpl_dir, exist_ok=True)
+    os.environ.setdefault('MPLCONFIGDIR', _mpl_dir)
+    os.environ.setdefault('MPLBACKEND', 'TkAgg')
+
 import customtkinter as ctk
 from config import BG_COLOR, WINDOW_WIDTH, WINDOW_HEIGHT, resource_path
 from backend import init_files, load_csv
