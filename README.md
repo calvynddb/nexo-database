@@ -17,7 +17,7 @@
 </p>
 
 <p align="center">
-  <img src="screenshots/dashboard.png" alt="nexo dashboard" width="800"/>
+  <img src="assets/screenshots/dashboard.png" alt="nexo dashboard"/>
 </p>
 
 > **Default login** — username: `admin` &nbsp;·&nbsp; password: `admin`
@@ -43,7 +43,7 @@ nexo is a desktop student information system built with Python and CustomTkinter
 
 The interface opens on a dashboard with three views — Students, Programs, and Colleges. Each view provides full **CRUDL** (Create, Read, Update, Delete, List) operations: records can be added individually or imported in bulk via CSV, edited in place through a detail popup, and deleted with a set-null cascade that keeps related records consistent. Tables support **search by fields** — a real-time filter that narrows results across all visible columns as you type — and **sort** on any column header, toggling ascending/descending order with numeric-aware comparison for year and ID fields. The Programs view also displays a donut chart (via matplotlib) showing enrollment distribution by college alongside a top-enrolled sidebar.
 
-All write operations are gated behind admin authentication. Credentials are stored as SHA-256 hashes with per-user random salts — passwords are never written to disk in plaintext. Additional administrators can be registered through the gear icon in the dashboard header after logging in. Logging out returns to a read-only guest view without redirecting to the login screen. The app packages into a single portable `.exe` via PyInstaller, seeding its CSV data files on first run.
+All write operations are gated behind admin authentication. Additional administrators can be registered through the gear icon in the dashboard header after logging in. Logging out returns to a read-only guest view without redirecting to the login screen. The app packages into a single portable `.exe` via PyInstaller, seeding its CSV data files on first run.
 
 ---
 
