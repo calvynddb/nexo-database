@@ -43,7 +43,7 @@ nexo is a desktop student information system built with Python and CustomTkinter
 
 The interface opens on a dashboard with three views — Students, Programs, and Colleges — each backed by paginated, sortable tables. Tables support real-time search that filters across all visible fields as you type, and clicking any column header toggles ascending/descending sort with numeric-aware ordering for year fields. Clicking a student row opens a detail profile popup with quick edit and delete actions. The Programs view also displays a donut chart (via matplotlib) showing enrollment distribution by college alongside a top-enrolled sidebar.
 
-All write operations — adding, editing, deleting, and bulk CSV import — are gated behind admin authentication. Credentials are stored in `users.csv`; additional administrators can be registered through the gear icon in the dashboard header after logging in. Logging out returns to a read-only guest view without redirecting to the login screen. The app packages into a single portable `.exe` via PyInstaller, seeding its CSV data files on first run.
+All write operations — adding, editing, deleting, and bulk CSV import — are gated behind admin authentication. Credentials are stored in `users.csv` as PBKDF2-HMAC-SHA256 hashes with per-user random salts — passwords are never stored in plaintext. Additional administrators can be registered through the gear icon in the dashboard header after logging in. Logging out returns to a read-only guest view without redirecting to the login screen. The app packages into a single portable `.exe` via PyInstaller, seeding its CSV data files on first run.
 
 ---
 
@@ -100,7 +100,7 @@ The app opens at **1400 × 940** in dark mode. CSV data files are created automa
 |---|---|
 | `admin` | `admin` |
 
-> Additional administrators can be registered via the gear icon in the dashboard header (visible when logged in).
+> The default admin account is created automatically on first launch with its password stored as a PBKDF2-HMAC-SHA256 hash — not in plaintext. Additional administrators can be registered via the gear icon in the dashboard header (visible when logged in).
 
 ---
 
@@ -118,8 +118,9 @@ nexo/
 │   └── icons/                       # 58 PNG icons (18/22/28/36 px sizes)
 │
 ├── backend/                         # Data layer (no UI dependencies)
-│   ├── __init__.py                  # Public API — init_files, load_csv, save_csv, create_backups
+│   ├── __init__.py                  # Public API — init_files, load_csv, save_csv, hash_password, verify_password
 │   ├── storage.py                   # CSV file I/O (init, load, save, backup, seed copy)
+│   ├── auth.py                      # Password hashing — PBKDF2-HMAC-SHA256, 260k iterations, random salt
 │   ├── validators.py                # Field-level validation for all entities
 │   ├── crud/
 │   │   ├── students.py              # StudentCRUD — create / read / update / delete / list
@@ -151,7 +152,7 @@ nexo/
 ├── students.csv                     # Student records
 ├── programs.csv                     # 59 pre-seeded programs
 ├── colleges.csv                     # 7 pre-seeded colleges
-└── users.csv                        # Admin credentials (username + SHA-256 hash)
+└── users.csv                        # Admin credentials (username, salt, PBKDF2-HMAC-SHA256 hash)
 ```
 
 ---
@@ -191,6 +192,7 @@ The project follows a **layered architecture** with clear separation between dat
 4. 𝗖𝘂𝘀𝗴𝗼𝗺 𝗱𝗶𝗮𝗹𝗼𝗴 𝘀𝘆𝘀𝗴𝗲𝗺 — A single `show_custom_dialog()` replaces all native message boxes with themed modal windows.
 5. 𝗣𝗮𝗴𝗵 𝗵𝗲𝗹𝗽𝗲𝗿𝘀 — `resource_path()` and `data_path()` enable seamless PyInstaller bundling.
 6. 𝗔𝗱𝗺𝗶𝗻 𝗺𝗮𝗻𝗮𝗴𝗲𝗺𝗲𝗻𝗴 — Administrators are registered and credentials changed via a gear-icon panel in the dashboard header, visible only when logged in.
+7. 𝗦𝗲𝗰𝘂𝗿𝗲 𝗰𝗿𝗲𝗱𝗲𝗻𝘁𝗶𝗮𝗹𝘀 — Passwords are hashed with PBKDF2-HMAC-SHA256 (260,000 iterations, 32-byte random salt per user) using Python's stdlib `hashlib` + `secrets`. Plain-text passwords are never written to disk.
 
 ---
 
@@ -256,6 +258,7 @@ Or run PyInstaller manually:
 
 ```bash
 python -m PyInstaller --noconfirm --onefile --windowed ^
+    --icon "assets/nexo.ico" ^
     --add-data "assets;assets" ^
     --add-data "config.py;." ^
     --add-data "students.csv;." --add-data "programs.csv;." ^

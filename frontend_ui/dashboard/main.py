@@ -419,11 +419,13 @@ class DashboardFrame(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Error", "Password must be at least 6 characters.", dialog_type="error")
                 return
             try:
+                from backend import hash_password
                 existing = load_csv('user')
                 if any(u.get('username') == uname for u in existing):
                     self.controller.show_custom_dialog("Error", f"Username '{uname}' is already taken.", dialog_type="error")
                     return
-                existing.append({'name': '', 'username': uname, 'email': '', 'password': pwd})
+                salt, pw_hash = hash_password(pwd)
+                existing.append({'username': uname, 'salt': salt, 'password': pw_hash})
                 save_csv('user', existing)
             except Exception as e:
                 self.controller.show_custom_dialog("Error", f"Could not save: {e}", dialog_type="error")
@@ -468,12 +470,19 @@ class DashboardFrame(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Error", "Password must be at least 6 characters.", dialog_type="error")
                 return
             try:
+                from backend import verify_password, hash_password
                 users = load_csv('user')
-                match = next((u for u in users if u.get('username') == uname and u.get('password') == old_pwd), None)
+                match = next(
+                    (u for u in users if u.get('username') == uname and
+                     verify_password(old_pwd, u.get('salt', ''), u.get('password', ''))),
+                    None
+                )
                 if not match:
                     self.controller.show_custom_dialog("Error", "Username or current password is incorrect.", dialog_type="error")
                     return
-                match['password'] = new_pwd
+                salt, pw_hash = hash_password(new_pwd)
+                match['salt'] = salt
+                match['password'] = pw_hash
                 save_csv('user', users)
             except Exception as e:
                 self.controller.show_custom_dialog("Error", f"Could not update: {e}", dialog_type="error")

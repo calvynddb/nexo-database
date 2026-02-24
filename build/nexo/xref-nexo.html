@@ -3176,6 +3176,7 @@ imported by:
   <tt>_hashlib</tt> <span class="moduletype"><tt>C:\Users\Calvyn\AppData\Local\Programs\Python\Python314\DLLs\_hashlib.pyd</tt></span>  <div class="import">
 imported by:
     <a href="#hashlib">hashlib</a>
+ &#8226;   <a href="#hmac">hmac</a>
 
   </div>
 
@@ -3186,6 +3187,16 @@ imported by:
   <tt>_heapq</tt> <span class="moduletype"><i>(builtin module)</i></span>  <div class="import">
 imported by:
     <a href="#heapq">heapq</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="_hmac"></a>
+  <tt>_hmac</tt> <span class="moduletype"><i>(builtin module)</i></span>  <div class="import">
+imported by:
+    <a href="#hmac">hmac</a>
 
   </div>
 
@@ -3340,7 +3351,8 @@ imported by:
   <a name="_operator"></a>
   <tt>_operator</tt> <span class="moduletype"><i>(builtin module)</i></span>  <div class="import">
 imported by:
-    <a href="#operator">operator</a>
+    <a href="#hmac">hmac</a>
+ &#8226;   <a href="#operator">operator</a>
 
   </div>
 
@@ -3974,13 +3986,15 @@ imported by:
   <a target="code" href="///C:/Users/Calvyn/Documents/GitHub/Simple-Student-Information-System/backend/__init__.py" type="text/plain"><tt>backend</tt></a>
 <span class="moduletype">Package</span>  <div class="import">
 imports:
-    <a href="#backend.storage">backend.storage</a>
+    <a href="#backend.auth">backend.auth</a>
+ &#8226;   <a href="#backend.storage">backend.storage</a>
  &#8226;   <a href="#backend.validators">backend.validators</a>
 
   </div>
   <div class="import">
 imported by:
-    <a href="#backend.storage">backend.storage</a>
+    <a href="#backend.auth">backend.auth</a>
+ &#8226;   <a href="#backend.storage">backend.storage</a>
  &#8226;   <a href="#backend.validators">backend.validators</a>
  &#8226;   <a href="#frontend_ui.auth.login">frontend_ui.auth.login</a>
  &#8226;   <a href="#frontend_ui.dashboard.main">frontend_ui.dashboard.main</a>
@@ -3988,6 +4002,24 @@ imported by:
  &#8226;   <a href="#frontend_ui.views.programs">frontend_ui.views.programs</a>
  &#8226;   <a href="#frontend_ui.views.students">frontend_ui.views.students</a>
  &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="backend.auth"></a>
+  <a target="code" href="///C:/Users/Calvyn/Documents/GitHub/Simple-Student-Information-System/backend/auth.py" type="text/plain"><tt>backend.auth</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#backend">backend</a>
+ &#8226;   <a href="#hashlib">hashlib</a>
+ &#8226;   <a href="#secrets">secrets</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#backend">backend</a>
 
   </div>
 
@@ -4049,6 +4081,7 @@ imported by:
  &#8226;   <a href="#email.encoders">email.encoders</a>
  &#8226;   <a href="#encodings.base64_codec">encodings.base64_codec</a>
  &#8226;   <a href="#http.server">http.server</a>
+ &#8226;   <a href="#secrets">secrets</a>
  &#8226;   <a href="#ssl">ssl</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
  &#8226;   <a href="#xmlrpc.client">xmlrpc.client</a>
@@ -10002,7 +10035,9 @@ imports:
   </div>
   <div class="import">
 imported by:
-    <a href="#random">random</a>
+    <a href="#backend.auth">backend.auth</a>
+ &#8226;   <a href="#hmac">hmac</a>
+ &#8226;   <a href="#random">random</a>
  &#8226;   <a href="#urllib.request">urllib.request</a>
 
   </div>
@@ -10022,6 +10057,26 @@ imported by:
     <a href="#collections">collections</a>
  &#8226;   <a href="#difflib">difflib</a>
  &#8226;   <a href="#main.py">main.py</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="hmac"></a>
+  <a target="code" href="///C:/Users/Calvyn/AppData/Local/Programs/Python/Python314/Lib/hmac.py" type="text/plain"><tt>hmac</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#_hashlib">_hashlib</a>
+ &#8226;   <a href="#_hmac">_hmac</a>
+ &#8226;   <a href="#_operator">_operator</a>
+ &#8226;   <a href="#hashlib">hashlib</a>
+ &#8226;   <a href="#warnings">warnings</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#secrets">secrets</a>
 
   </div>
 
@@ -11986,6 +12041,7 @@ imported by:
     <a href="#PIL.ImagePalette">PIL.ImagePalette</a>
  &#8226;   <a href="#email.generator">email.generator</a>
  &#8226;   <a href="#email.utils">email.utils</a>
+ &#8226;   <a href="#secrets">secrets</a>
  &#8226;   <a href="#statistics">statistics</a>
  &#8226;   <a href="#tempfile">tempfile</a>
 
@@ -12215,6 +12271,24 @@ imported by:
 <span class="moduletype">MissingModule</span>  <div class="import">
 imported by:
     <a href="#posix">posix</a>
+
+  </div>
+
+</div>
+
+<div class="node">
+  <a name="secrets"></a>
+  <a target="code" href="///C:/Users/Calvyn/AppData/Local/Programs/Python/Python314/Lib/secrets.py" type="text/plain"><tt>secrets</tt></a>
+<span class="moduletype">SourceModule</span>  <div class="import">
+imports:
+    <a href="#base64">base64</a>
+ &#8226;   <a href="#hmac">hmac</a>
+ &#8226;   <a href="#random">random</a>
+
+  </div>
+  <div class="import">
+imported by:
+    <a href="#backend.auth">backend.auth</a>
 
   </div>
 
@@ -13738,6 +13812,7 @@ imported by:
  &#8226;   <a href="#gettext">gettext</a>
  &#8226;   <a href="#glob">glob</a>
  &#8226;   <a href="#gzip">gzip</a>
+ &#8226;   <a href="#hmac">hmac</a>
  &#8226;   <a href="#http.cookiejar">http.cookiejar</a>
  &#8226;   <a href="#http.server">http.server</a>
  &#8226;   <a href="#importlib.abc">importlib.abc</a>

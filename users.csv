@@ -1,1 +1,1 @@
-name,username,email,password
+username,salt,password

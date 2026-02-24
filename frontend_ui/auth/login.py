@@ -73,20 +73,22 @@ class LoginFrame(ctk.CTkFrame):
             self.controller.show_custom_dialog("Error", "Please enter username and password", dialog_type="error")
             return
         
-        # check built-in admin account first
-        authenticated = (user == "admin" and pwd == "admin")
-        
-        # check registered users in users.csv
-        if not authenticated:
-            try:
-                from backend import load_csv
-                users = load_csv('user')
-                authenticated = any(
-                    u.get('username') == user and u.get('password') == pwd
-                    for u in users
-                )
-            except Exception:
-                pass
+        authenticated = False
+        try:
+            from backend import load_csv, verify_password, hash_password, save_csv
+            users = load_csv('user')
+            # auto-create default hashed admin if no users exist yet
+            if not users:
+                salt, pw_hash = hash_password('admin')
+                users = [{'username': 'admin', 'salt': salt, 'password': pw_hash}]
+                save_csv('user', users)
+            authenticated = any(
+                u.get('username') == user and
+                verify_password(pwd, u.get('salt', ''), u.get('password', ''))
+                for u in users
+            )
+        except Exception:
+            pass
         
         if authenticated:
             self.controller.logged_in = True

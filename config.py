@@ -64,7 +64,7 @@ FIELDS = {
     'college': ['code', 'name'],
     'program': ['code', 'name', 'college'],
     'student': ['id', 'firstname', 'lastname', 'program', 'year', 'gender'],
-    'user': ['name', 'username', 'email', 'password'],
+    'user': ['username', 'salt', 'password'],
 }
 
 # --- window dimensions ---
