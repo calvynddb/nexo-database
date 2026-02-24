@@ -3,6 +3,7 @@ REM Build a single-file, windowed executable using PyInstaller
 REM Bundles all source code, assets, CSV seed data, and dependencies.
 
 pyinstaller --noconfirm --onefile --windowed ^
+    --icon "assets/nexo.ico" ^
     --add-data "assets;assets" ^
     --add-data "config.py;." ^
     --add-data "students.csv;." ^
