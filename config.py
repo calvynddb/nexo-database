@@ -19,7 +19,7 @@ def resource_path(relative_path):
 
 
 def data_path(relative_path):
-    """Get absolute path to a writable data file (CSVs, user data).
+    """Get absolute path to a writable data file.
     In bundled mode, resolves relative to the directory containing the .exe.
     In development, resolves relative to the project root.
     """
@@ -51,21 +51,6 @@ TEXT_MUTED = "#8a8a95"  # muted gray-blue (darker for readability)
 TEXT_PRIMARY = "#e8e8f0"  # soft off-white for main text
 BORDER_COLOR = "#2a1f35"  # subtle purple border for definition
 PANEL_SELECTED = "#2d1f45"  # subtle purple selection highlight
-
-# --- csv files and fields ---
-FILES = {
-    'college': data_path('colleges.csv'),
-    'program': data_path('programs.csv'),
-    'student': data_path('students.csv'),
-    'user': data_path('users.csv'),
-}
-
-FIELDS = {
-    'college': ['code', 'name'],
-    'program': ['code', 'name', 'college'],
-    'student': ['id', 'firstname', 'lastname', 'program', 'year', 'gender'],
-    'user': ['username', 'salt', 'password'],
-}
 
 # --- window dimensions ---
 WINDOW_WIDTH = 1400

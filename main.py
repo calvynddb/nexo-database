@@ -16,7 +16,8 @@ if getattr(sys, 'frozen', False):
 
 import customtkinter as ctk
 from config import BG_COLOR, WINDOW_WIDTH, WINDOW_HEIGHT, resource_path
-from backend import init_files, load_csv
+from backend import init_files, get_session
+from backend.models import College, Program, Student, User
 from frontend_ui.auth import LoginFrame
 from frontend_ui.dashboard import DashboardFrame
 from frontend_ui.ui.utils import show_dialog
@@ -61,15 +62,433 @@ class App(ctk.CTk):
         self.destroy()
 
     def _load_data(self):
-        """Initialise CSV files and load all data, falling back to empty lists on error."""
-        init_files()
-        for key, attr in (('college', 'colleges'), ('program', 'programs'), ('student', 'students')):
-            try:
-                setattr(self, attr, load_csv(key))
-            except Exception:
-                import traceback
-                traceback.print_exc()
-                setattr(self, attr, [])
+        """Initialize database and load all data from SQLite, falling back to empty lists on error."""
+        session = None
+        try:
+            init_files()
+
+            # Load data from database
+            session = get_session()
+            colleges = session.query(College).all()
+            programs = session.query(Program).all()
+            students = session.query(Student).all()
+
+            # Convert SQLAlchemy objects to dictionaries for frontend compatibility
+            # (Phase 1: maintain existing frontend interface; Phase 2 will refactor to use ORM directly)
+            self.colleges = [{'code': c.code, 'name': c.name} for c in colleges]
+            self.programs = [{'code': p.code, 'name': p.name, 'college': p.college.code} for p in programs]
+            self.students = [
+                {
+                    'id': s.id,
+                    'firstname': s.firstname,
+                    'lastname': s.lastname,
+                    'program': s.program.code,
+                    'year': str(s.year),
+                    'gender': s.gender
+                }
+                for s in students
+            ]
+        except Exception:
+            import traceback
+            traceback.print_exc()
+            self.colleges = []
+            self.programs = []
+            self.students = []
+        finally:
+            if session is not None:
+                session.close()
+
+    def refresh_data(self):
+        """Reload all data from database after modifications."""
+        self._load_data()
+
+    def update_student(self, student_id: str, updates: dict) -> tuple[bool, str]:
+        """Update a student in the database and refresh cache.
+        
+        Args:
+            student_id: Student ID (e.g., "2023-0001")
+            updates: Dict with fields to update (firstname, lastname, gender, year, program)
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            student = session.query(Student).filter(Student.id == student_id).first()
+            
+            if not student:
+                session.close()
+                return False, "Student not found"
+            
+            # Handle program code -> program_id lookup
+            if 'program' in updates:
+                program = session.query(Program).filter(Program.code == updates['program']).first()
+                if not program:
+                    session.close()
+                    return False, f"Program '{updates['program']}' not found"
+                student.program_id = program.id
+                updates.pop('program')
+            
+            # Update allowed fields
+            for key, value in updates.items():
+                if key in ('firstname', 'lastname', 'gender', 'year'):
+                    if key == 'year':
+                        setattr(student, key, int(value))
+                    else:
+                        setattr(student, key, value)
+            
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "Student updated successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def delete_student(self, student_id: str) -> tuple[bool, str]:
+        """Delete a student from the database and refresh cache.
+        
+        Args:
+            student_id: Student ID (e.g., "2023-0001")
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            student = session.query(Student).filter(Student.id == student_id).first()
+            
+            if not student:
+                session.close()
+                return False, "Student not found"
+            
+            session.delete(student)
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "Student deleted successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def add_student(self, student_data: dict) -> tuple[bool, str]:
+        """Add a new student to the database and refresh cache.
+        
+        Args:
+            student_data: Dict with fields (id, firstname, lastname, gender, year, program)
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            
+            # Check if ID already exists
+            existing = session.query(Student).filter(Student.id == student_data['id']).first()
+            if existing:
+                session.close()
+                return False, "Student ID already exists"
+            
+            # Look up program by code
+            program = session.query(Program).filter(Program.code == student_data['program']).first()
+            if not program:
+                session.close()
+                return False, f"Program '{student_data['program']}' not found"
+            
+            # Create new student
+            new_student = Student(
+                id=student_data['id'],
+                firstname=student_data['firstname'],
+                lastname=student_data['lastname'],
+                program_id=program.id,
+                year=int(student_data['year']),
+                gender=student_data['gender']
+            )
+            
+            session.add(new_student)
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "Student added successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def update_program(self, program_code: str, updates: dict) -> tuple[bool, str]:
+        """Update a program in the database and refresh cache.
+        
+        Args:
+            program_code: Program code (e.g., "CS101")
+            updates: Dict with fields to update (name, college)
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            program = session.query(Program).filter(Program.code == program_code).first()
+            
+            if not program:
+                session.close()
+                return False, "Program not found"
+            
+            # Handle college code -> college_id lookup
+            if 'college' in updates:
+                college = session.query(College).filter(College.code == updates['college']).first()
+                if not college:
+                    session.close()
+                    return False, f"College '{updates['college']}' not found"
+                program.college_id = college.id
+                updates.pop('college')
+            
+            # Update allowed fields
+            for key, value in updates.items():
+                if key in ('name',):
+                    setattr(program, key, value)
+            
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "Program updated successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def delete_program(self, program_code: str) -> tuple[bool, str]:
+        """Delete a program from the database and refresh cache.
+        
+        Args:
+            program_code: Program code (e.g., "CS101")
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            program = session.query(Program).filter(Program.code == program_code).first()
+            
+            if not program:
+                session.close()
+                return False, "Program not found"
+            
+            # Check if program has students (prevent deletion if it does)
+            if program.students:
+                session.close()
+                return False, "Cannot delete program with enrolled students"
+            
+            session.delete(program)
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "Program deleted successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def add_program(self, program_data: dict) -> tuple[bool, str]:
+        """Add a new program to the database and refresh cache.
+        
+        Args:
+            program_data: Dict with fields (code, name, college)
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            
+            # Check if code already exists
+            existing = session.query(Program).filter(Program.code == program_data['code']).first()
+            if existing:
+                session.close()
+                return False, "Program code already exists"
+            
+            # Look up college by code
+            college = session.query(College).filter(College.code == program_data['college']).first()
+            if not college:
+                session.close()
+                return False, f"College '{program_data['college']}' not found"
+            
+            # Create new program
+            new_program = Program(
+                code=program_data['code'],
+                name=program_data['name'],
+                college_id=college.id
+            )
+            
+            session.add(new_program)
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "Program added successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def update_college(self, college_code: str, updates: dict) -> tuple[bool, str]:
+        """Update a college in the database and refresh cache.
+        
+        Args:
+            college_code: College code
+            updates: Dict with fields to update (name)
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            college = session.query(College).filter(College.code == college_code).first()
+            
+            if not college:
+                session.close()
+                return False, "College not found"
+            
+            # Update allowed fields
+            for key, value in updates.items():
+                if key in ('name',):
+                    setattr(college, key, value)
+            
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "College updated successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def delete_college(self, college_code: str) -> tuple[bool, str]:
+        """Delete a college from the database and refresh cache.
+        
+        Args:
+            college_code: College code
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            college = session.query(College).filter(College.code == college_code).first()
+            
+            if not college:
+                session.close()
+                return False, "College not found"
+            
+            # Check if college has programs (prevent deletion if it does)
+            if college.programs:
+                session.close()
+                return False, "Cannot delete college with active programs"
+            
+            session.delete(college)
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "College deleted successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def add_college(self, college_data: dict) -> tuple[bool, str]:
+        """Add a new college to the database and refresh cache.
+        
+        Args:
+            college_data: Dict with fields (code, name)
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            session = get_session()
+            
+            # Check if code already exists
+            existing = session.query(College).filter(College.code == college_data['code']).first()
+            if existing:
+                session.close()
+                return False, "College code already exists"
+            
+            # Create new college
+            new_college = College(
+                code=college_data['code'],
+                name=college_data['name']
+            )
+            
+            session.add(new_college)
+            session.commit()
+            session.close()
+            self.refresh_data()
+            return True, "College added successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def create_user(self, username: str, password: str) -> tuple[bool, str]:
+        """Create a new user in the database.
+        
+        Args:
+            username: Username
+            password: Plain-text password
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            from backend.auth import hash_password
+            from backend.models import User
+            
+            session = get_session()
+            
+            # Check if user already exists
+            existing = session.query(User).filter(User.username == username).first()
+            if existing:
+                session.close()
+                return False, f"Username '{username}' already exists"
+            
+            # Hash password with salt
+            salt, pw_hash = hash_password(password)
+            
+            # Create new user
+            new_user = User(
+                username=username,
+                salt=salt,
+                password=pw_hash
+            )
+            
+            session.add(new_user)
+            session.commit()
+            session.close()
+            return True, f"User '{username}' created successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
+    def change_password(self, username: str, old_password: str, new_password: str) -> tuple[bool, str]:
+        """Change a user's password.
+        
+        Args:
+            username: Username
+            old_password: Current password (for verification)
+            new_password: New password
+            
+        Returns:
+            (success: bool, message: str)
+        """
+        try:
+            from backend.auth import hash_password, verify_password
+            from backend.models import User
+            
+            session = get_session()
+            
+            # Find user
+            user = session.query(User).filter(User.username == username).first()
+            if not user:
+                session.close()
+                return False, f"User '{username}' not found"
+            
+            # Verify old password
+            if not verify_password(old_password, user.salt, user.password):
+                session.close()
+                return False, "Current password is incorrect"
+            
+            # Hash new password
+            salt, pw_hash = hash_password(new_password)
+            user.salt = salt
+            user.password = pw_hash
+            
+            session.commit()
+            session.close()
+            return True, "Password changed successfully"
+        except Exception as e:
+            return False, f"Error: {str(e)}"
+
 
     def _build_frames(self):
         """Create the root container and instantiate all application frames."""

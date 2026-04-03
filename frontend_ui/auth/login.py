@@ -75,18 +75,15 @@ class LoginFrame(ctk.CTkFrame):
         
         authenticated = False
         try:
-            from backend import load_csv, verify_password, hash_password, save_csv
-            users = load_csv('user')
-            # auto-create default hashed admin if no users exist yet
-            if not users:
-                salt, pw_hash = hash_password('admin')
-                users = [{'username': 'admin', 'salt': salt, 'password': pw_hash}]
-                save_csv('user', users)
-            authenticated = any(
-                u.get('username') == user and
-                verify_password(pwd, u.get('salt', ''), u.get('password', ''))
-                for u in users
-            )
+            from backend import get_session, verify_password
+            from backend.models import User
+            
+            session = get_session()
+            db_user = session.query(User).filter(User.username == user).first()
+            session.close()
+            
+            if db_user and verify_password(pwd, db_user.salt, db_user.password):
+                authenticated = True
         except Exception:
             pass
         
@@ -162,15 +159,26 @@ class LoginFrame(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Error", "Password must be at least 6 characters", dialog_type="error")
                 return
             
-            # check for duplicate username
+            # check for duplicate username and create new user
             try:
-                from backend import load_csv, save_csv
-                existing = load_csv('user')
-                if any(u.get('username') == username for u in existing):
+                from backend import get_session, hash_password
+                from backend.models import User
+                
+                session = get_session()
+                
+                # Check if username already exists
+                existing = session.query(User).filter(User.username == username).first()
+                if existing:
+                    session.close()
                     self.controller.show_custom_dialog("Error", f"Username '{username}' is already taken.", dialog_type="error")
                     return
-                existing.append({'name': name, 'username': username, 'email': email, 'password': password})
-                save_csv('user', existing)
+                
+                # Create and save new user
+                salt, pw_hash = hash_password(password)
+                new_user = User(username=username, salt=salt, password=pw_hash)
+                session.add(new_user)
+                session.commit()
+                session.close()
             except Exception as e:
                 self.controller.show_custom_dialog("Error", f"Could not save user: {e}", dialog_type="error")
                 return

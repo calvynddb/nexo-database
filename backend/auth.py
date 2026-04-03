@@ -2,7 +2,7 @@
 Password hashing using SHA-256 with a per-user random salt.
 No third-party dependencies — uses only Python stdlib (hashlib, secrets).
 
-Stored format in users.csv:
+Stored fields in the users table:
     username  — plaintext username
     salt      — 32-character hex string (16 random bytes)
     password  — 64-character hex string (SHA-256 digest of salt+password)

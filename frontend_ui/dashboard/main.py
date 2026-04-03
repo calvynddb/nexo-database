@@ -242,14 +242,6 @@ class DashboardFrame(ctk.CTkFrame):
                                         hover_color="#3a2f45", border_width=0, command=self.handle_refresh)
         self.refresh_btn.pack(side="left", padx=(0, 8))
         
-        # import button
-        self.import_btn = ctk.CTkButton(button_container, text="Import", width=110, height=50,
-                                       font=get_font(12, True),
-                                       fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY,
-                                       hover_color="#7C3AED", 
-                                       command=self.handle_import)
-        self.import_btn.pack(side="left", padx=(0, 10))
-        
         # add entry button
         self.add_btn = ctk.CTkButton(button_container, text="Add Entry", width=110, height=50,
                                     font=get_font(12, True),
@@ -258,33 +250,19 @@ class DashboardFrame(ctk.CTkFrame):
                                     command=self.handle_add_entry)
         self.add_btn.pack(side="left", padx=(0, 0))
         
-        # disable add button and import button initially (guest mode)
+        # disable add button initially (guest mode)
         self.update_button_states()
 
     def update_button_states(self):
         """Update button states based on login status."""
         if not self.controller.logged_in:
             self.add_btn.configure(state="disabled", fg_color="#555555")
-            self.import_btn.configure(state="disabled", fg_color="#555555")
         else:
             self.add_btn.configure(state="normal", fg_color=ACCENT_COLOR)
-            self.import_btn.configure(state="normal", fg_color=ACCENT_COLOR)
     
     def handle_refresh(self):
-        """Refresh the current view's data from disk and update table + sidebar."""
-        from backend import load_csv
-        try:
-            self.controller.colleges = load_csv('college')
-        except Exception:
-            pass
-        try:
-            self.controller.programs = load_csv('program')
-        except Exception:
-            pass
-        try:
-            self.controller.students = load_csv('student')
-        except Exception:
-            pass
+        """Refresh the current view's data from SQLite and update table + sidebar."""
+        self.controller.refresh_data()
         if self.current_view and self.current_view in self.views:
             view = self.views[self.current_view]
             view.refresh_table()
@@ -294,17 +272,6 @@ class DashboardFrame(ctk.CTkFrame):
                 except Exception:
                     pass
             self.search_entry.delete(0, "end")
-    
-    def handle_import(self):
-        """Handle import button - delegates to current view."""
-        if not self.controller.logged_in:
-            self.controller.show_custom_dialog("Access Denied", "Please log in first to import data.")
-            self.handle_login_click()
-            return
-        
-        if self.current_view and self.current_view in self.views:
-            if hasattr(self.views[self.current_view], 'import_data'):
-                self.views[self.current_view].import_data()
 
     def handle_add_entry(self):
         """Handle add entry button - delegates to current view."""
@@ -363,7 +330,6 @@ class DashboardFrame(ctk.CTkFrame):
     def open_admin_panel(self):
         """Open admin management panel for registering admins and changing credentials."""
         from frontend_ui.ui import DepthCard
-        from backend import load_csv, save_csv
 
         panel = ctk.CTkToplevel(self)
         panel.title("Admin Management")
@@ -418,21 +384,14 @@ class DashboardFrame(ctk.CTkFrame):
             if len(pwd) < 6:
                 self.controller.show_custom_dialog("Error", "Password must be at least 6 characters.", dialog_type="error")
                 return
-            try:
-                from backend import hash_password
-                existing = load_csv('user')
-                if any(u.get('username') == uname for u in existing):
-                    self.controller.show_custom_dialog("Error", f"Username '{uname}' is already taken.", dialog_type="error")
-                    return
-                salt, pw_hash = hash_password(pwd)
-                existing.append({'username': uname, 'salt': salt, 'password': pw_hash})
-                save_csv('user', existing)
-            except Exception as e:
-                self.controller.show_custom_dialog("Error", f"Could not save: {e}", dialog_type="error")
-                return
-            for w in [reg_user, reg_pass, reg_conf]:
-                w.delete(0, "end")
-            self.controller.show_custom_dialog("Success", f"Admin '{uname}' registered successfully.")
+            
+            success, msg = self.controller.create_user(uname, pwd)
+            if success:
+                for w in [reg_user, reg_pass, reg_conf]:
+                    w.delete(0, "end")
+                self.controller.show_custom_dialog("Success", msg)
+            else:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
 
         ctk.CTkButton(scroll, text="Register", height=38, font=get_font(13, True),
                       fg_color=ACCENT_COLOR, text_color="white", hover_color="#7C3AED",
@@ -469,27 +428,14 @@ class DashboardFrame(ctk.CTkFrame):
             if len(new_pwd) < 6:
                 self.controller.show_custom_dialog("Error", "Password must be at least 6 characters.", dialog_type="error")
                 return
-            try:
-                from backend import verify_password, hash_password
-                users = load_csv('user')
-                match = next(
-                    (u for u in users if u.get('username') == uname and
-                     verify_password(old_pwd, u.get('salt', ''), u.get('password', ''))),
-                    None
-                )
-                if not match:
-                    self.controller.show_custom_dialog("Error", "Username or current password is incorrect.", dialog_type="error")
-                    return
-                salt, pw_hash = hash_password(new_pwd)
-                match['salt'] = salt
-                match['password'] = pw_hash
-                save_csv('user', users)
-            except Exception as e:
-                self.controller.show_custom_dialog("Error", f"Could not update: {e}", dialog_type="error")
-                return
-            for w in [chg_user, chg_old, chg_new, chg_conf]:
-                w.delete(0, "end")
-            self.controller.show_custom_dialog("Success", "Credentials updated successfully.")
+            
+            success, msg = self.controller.change_password(uname, old_pwd, new_pwd)
+            if success:
+                for w in [chg_user, chg_old, chg_new, chg_conf]:
+                    w.delete(0, "end")
+                self.controller.show_custom_dialog("Success", msg)
+            else:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
 
         ctk.CTkButton(scroll, text="Update Password", height=38, font=get_font(13, True),
                       fg_color="#6d28d9", text_color="white", hover_color="#5b21b6",

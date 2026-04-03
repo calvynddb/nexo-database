@@ -9,11 +9,11 @@ from tkinter import ttk
 
 from config import (
     FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR, 
-    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY, FILES
+    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY
 )
 from config import get_font
 from frontend_ui.ui import DepthCard, setup_treeview_style, placeholder_image, get_icon, StyledComboBox
-from backend import validate_program, save_csv
+from backend import validate_program
 
 
 class ProgramsView(ctk.CTkFrame):
@@ -550,9 +550,6 @@ class ProgramsView(ctk.CTkFrame):
                 self.on_row_select(None)
 
         def _delete():
-            program_obj = next((p for p in self.controller.programs if p['code'] == prog_code), None)
-            if not program_obj:
-                return
             affected_students = [s for s in self.controller.students if s.get('program', '') == prog_code]
             warning_parts = [f"Are you sure you want to delete program '{prog_code}'?"]
             if affected_students:
@@ -560,11 +557,14 @@ class ProgramsView(ctk.CTkFrame):
             else:
                 warning_parts.append("\n\nNo students will be affected.")
             if self.controller.show_custom_dialog("Confirm Delete", "".join(warning_parts), dialog_type="yesno"):
-                profile_window.destroy()
-                self.controller.programs.remove(program_obj)
-                save_csv('program', self.controller.programs)
-                self.refresh_table()
-                self.controller.show_custom_dialog("Success", "Program deleted successfully!")
+                success, msg = self.controller.delete_program(prog_code)
+                if success:
+                    profile_window.destroy()
+                    self.controller.refresh_data()
+                    self.refresh_table()
+                    self.controller.show_custom_dialog("Success", "Program deleted successfully!")
+                else:
+                    self.controller.show_custom_dialog("Error", msg, dialog_type="error")
 
         # only show edit/delete buttons if user is logged in
         if self.controller.logged_in:
@@ -660,8 +660,11 @@ class ProgramsView(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Error", msg, dialog_type="error")
                 return
             
-            self.controller.programs.append(new_prog)
-            save_csv('program', self.controller.programs)
+            success, msg = self.controller.add_program(new_prog)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+            
             self.refresh_table()
             try:
                 for w in self.right_panel.winfo_children():
@@ -736,12 +739,10 @@ class ProgramsView(ctk.CTkFrame):
             warning_parts.append("\n\nNo students will be affected.")
         
         if self.controller.show_custom_dialog("Confirm Delete", "".join(warning_parts), dialog_type="yesno"):
-            for s in self.controller.students:
-                if s.get('program') == prog_code:
-                    s['program'] = ''
-            save_csv('student', self.controller.students)
-            self.controller.programs.remove(program)
-            save_csv('program', self.controller.programs)
+            success, msg = self.controller.delete_program(prog_code)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
             self.refresh_table()
             try:
                 self.refresh_sidebar()
@@ -836,112 +837,35 @@ class ProgramsView(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Validation Error", error_msg, dialog_type="error")
                 return
             
-            program['name'] = name_entry.get().strip().title()
-            program['college'] = college_widget.get()
-            ok, msg = validate_program(program)
-            if not ok:
+            program_name = name_entry.get().strip().title()
+            college_code = college_widget.get()
+            
+            success, msg = self.controller.update_program(prog_code, {
+                'name': program_name,
+                'college': college_code
+            })
+            
+            if success:
+                edit_window.destroy()
+                self.controller.refresh_data()
+                self.refresh_table()
+                self.controller.show_custom_dialog("Success", "Program updated successfully!")
+            else:
                 self.controller.show_custom_dialog("Error", msg, dialog_type="error")
-                return
-            try:
-                save_csv('program', self.controller.programs)
-            except Exception:
-                self.controller.show_custom_dialog("Error", "Failed to save program", dialog_type="error")
-                return
-            edit_window.destroy()
-            self.refresh_table()
-            self.controller.show_custom_dialog("Success", "Program updated successfully!")
         
         def delete():
-            if self.controller.show_custom_dialog("Confirm Delete", f"Delete {program['code']}?", dialog_type="yesno"):
-                self.controller.programs.remove(program)
-                save_csv('program', self.controller.programs)
-                edit_window.destroy()
-                self.refresh_table()
-                self.controller.show_custom_dialog("Success", "Program deleted successfully!")
+            if self.controller.show_custom_dialog("Confirm Delete", f"Delete {prog_code}?", dialog_type="yesno"):
+                success, msg = self.controller.delete_program(prog_code)
+                if success:
+                    edit_window.destroy()
+                    self.controller.refresh_data()
+                    self.refresh_table()
+                    self.controller.show_custom_dialog("Success", "Program deleted successfully!")
+                else:
+                    self.controller.show_custom_dialog("Error", msg, dialog_type="error")
         
         ctk.CTkButton(button_frame, text="Save Changes", command=save, height=40,
                      fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 5))
         ctk.CTkButton(button_frame, text="Delete", command=delete, height=40,
                      fg_color="#c41e3a", font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
-
-    def import_data(self):
-        """Import programs from CSV file."""
-        from tkinter import filedialog
-        import csv
-        
-        file_path = filedialog.askopenfilename(
-            title="Select CSV file to import",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
-        )
-        
-        if not file_path:
-            return
-        
-        try:
-            imported_count = 0
-            error_count = 0
-            errors = []
-            
-            with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                existing_codes = set()
-                
-                # load existing codes
-                try:
-                    import csv as csv_module
-                    with open(FILES['program'], 'r', encoding='utf-8') as existing:
-                        existing_reader = csv_module.DictReader(existing)
-                        for row in existing_reader:
-                            existing_codes.add(row['code'])
-                except:
-                    pass
-                
-                rows_to_add = []
-                for row_num, row in enumerate(reader, start=2):
-                    # validate the row
-                    is_valid, error_msg = validate_program({
-                        'code': row.get('code', ''),
-                        'name': row.get('name', ''),
-                        'college': row.get('college', '')
-                    })
-                    
-                    if not is_valid:
-                        error_count += 1
-                        errors.append(f"Row {row_num}: {error_msg}")
-                        continue
-                    
-                    # check if code already exists
-                    if row.get('code') in existing_codes:
-                        error_count += 1
-                        errors.append(f"Row {row_num}: Program code {row.get('code')} already exists")
-                        continue
-                    
-                    rows_to_add.append(row)
-                    existing_codes.add(row.get('code'))
-                    imported_count += 1
-                
-                # append to CSV file
-                if rows_to_add:
-                    with open(FILES['program'], 'a', newline='', encoding='utf-8') as f:
-                        writer = csv.DictWriter(f, fieldnames=['code', 'name', 'college'])
-                        for row in rows_to_add:
-                            writer.writerow({
-                                'code': row.get('code', ''),
-                                'name': row.get('name', ''),
-                                'college': row.get('college', '')
-                            })
-                    
-                    self.refresh_table()
-            
-            # show results
-            if error_count == 0:
-                self.controller.show_custom_dialog("Import Success", f"Successfully imported {imported_count} programs!")
-            else:
-                error_msg = "\n".join(errors[:10])
-                if len(errors) > 10:
-                    error_msg += f"\n... and {len(errors) - 10} more errors"
-                self.controller.show_custom_dialog("Import Complete", f"Imported {imported_count} programs.\n{error_count} errors:\n\n{error_msg}", dialog_type="warning")
-        
-        except Exception as e:
-            self.controller.show_custom_dialog("Import Error", f"Failed to import: {str(e)}", dialog_type="error")
 

@@ -1,58 +1,18 @@
 """
-CSV storage and file operations.
+Database storage and initialization.
+
+Provides SQLite database setup helpers.
 """
 
-import csv
-import os
-import sys
-import shutil
-from config import FILES, FIELDS, resource_path
+from backend.database import init_db as _init_db
 
 
 def init_files():
-    """Initialize CSV files with headers if they don't exist.
-    
-    When running as a PyInstaller bundle, copies bundled CSV seed files
-    to the writable data directory on first run.
-    """
-    for key, filepath in FILES.items():
-        if not os.path.exists(filepath):
-            # if running frozen, try to copy the bundled seed csv first
-            if getattr(sys, 'frozen', False):
-                bundled = resource_path(os.path.basename(filepath))
-                if os.path.exists(bundled):
-                    shutil.copy2(bundled, filepath)
-                    continue
-            # otherwise create empty csv with headers
-            with open(filepath, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=FIELDS[key])
-                writer.writeheader()
-
-
-def load_csv(key):
-    """Load data from CSV file."""
-    if not os.path.exists(FILES[key]):
-        init_files()
-    with open(FILES[key], 'r', newline='') as f:
-        return list(csv.DictReader(f))
-
-
-def save_csv(key, data):
-    """Save data to CSV file."""
-    with open(FILES[key], 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDS[key])
-        writer.writeheader()
-        try:
-            writer.writerows(data)
-        except Exception:
-            # fail-safe: write rows that are dict-like only
-            safe_rows = []
-            for r in data:
-                if isinstance(r, dict):
-                    safe_rows.append(r)
-            writer.writerows(safe_rows)
+    """Initialize SQLite database schema."""
+    _init_db()
 
 
 def create_backups():
-    """Create backup of all CSV files (placeholder for future implementation)."""
+    """Create backup of database (placeholder for future implementation)."""
     pass
+

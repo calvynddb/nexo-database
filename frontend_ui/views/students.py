@@ -7,11 +7,11 @@ from tkinter import ttk
 
 from config import (
     FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR, 
-    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY, FILES
+    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY
 )
 from config import get_font
 from frontend_ui.ui import DepthCard, setup_treeview_style, placeholder_image, get_icon, SearchableComboBox, StyledComboBox
-from backend import validate_student, save_csv
+from backend import validate_student
 
 
 class StudentsView(ctk.CTkFrame):
@@ -581,21 +581,22 @@ class StudentsView(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Validation Error", error_msg, dialog_type="error")
                 return
 
-            student['firstname'] = fname_entry.get().strip().title()
-            student['lastname'] = lname_entry.get().strip().title()
-            student['gender'] = gender_combo.get()
-            student['year'] = year_combo.get()
-            student['program'] = program_widget.get()
+            updates = {
+                'firstname': fname_entry.get().strip().title(),
+                'lastname': lname_entry.get().strip().title(),
+                'gender': gender_combo.get(),
+                'year': year_combo.get(),
+                'program': program_widget.get(),
+            }
 
-            ok, msg = validate_student(student)
+            ok, msg = validate_student(updates)
             if not ok:
                 self.controller.show_custom_dialog("Error", msg, dialog_type="error")
                 return
 
-            try:
-                save_csv('student', self.controller.students)
-            except Exception:
-                self.controller.show_custom_dialog("Error", "Failed to save student", dialog_type="error")
+            success, msg = self.controller.update_student(student_id, updates)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
                 return
 
             edit_window.destroy()
@@ -604,8 +605,10 @@ class StudentsView(ctk.CTkFrame):
 
         def delete():
             if self.controller.show_custom_dialog("Confirm Delete", f"Delete {student['id']}?", dialog_type="yesno"):
-                self.controller.students.remove(student)
-                save_csv('student', self.controller.students)
+                success, msg = self.controller.delete_student(student_id)
+                if not success:
+                    self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                    return
                 edit_window.destroy()
                 self.refresh_table()
                 self.controller.show_custom_dialog("Success", "Student deleted successfully!")
@@ -629,8 +632,10 @@ class StudentsView(ctk.CTkFrame):
             return
 
         if self.controller.show_custom_dialog("Confirm Delete", f"Delete student {student_id}?", dialog_type="yesno"):
-            self.controller.students.remove(student)
-            save_csv('student', self.controller.students)
+            success, msg = self.controller.delete_student(student_id)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
             self.refresh_table()
             self.controller.show_custom_dialog("Success", "Student deleted successfully!")
 
@@ -757,8 +762,11 @@ class StudentsView(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Error", msg, dialog_type="error")
                 return
             
-            self.controller.students.append(new_student)
-            save_csv('student', self.controller.students)
+            success, msg = self.controller.add_student(new_student)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+            
             self.refresh_table()
             try:
                 self.refresh_sidebar()
@@ -775,99 +783,5 @@ class StudentsView(ctk.CTkFrame):
                  fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 6))
         ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, height=40,
                  fg_color="#555555", text_color="white", font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(6, 0))
-
-    def import_data(self):
-        """Import students from CSV file."""
-        # check authentication
-        if not self.controller.logged_in:
-            self.controller.show_custom_dialog("Access Denied", "You must log in to import students.")
-            return
-        
-        from tkinter import filedialog
-        import csv
-        
-        file_path = filedialog.askopenfilename(
-            title="Select CSV file to import",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
-        )
-        
-        if not file_path:
-            return
-        
-        try:
-            imported_count = 0
-            error_count = 0
-            errors = []
-            
-            with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                existing_ids = set()
-                
-                # load existing IDs
-                try:
-                    import csv as csv_module
-                    with open(FILES['student'], 'r', encoding='utf-8') as existing:
-                        existing_reader = csv_module.DictReader(existing)
-                        for row in existing_reader:
-                            existing_ids.add(row['id'])
-                except:
-                    pass
-                
-                rows_to_add = []
-                for row_num, row in enumerate(reader, start=2):
-                    # validate the row
-                    is_valid, error_msg = validate_student({
-                        'id': row.get('id', ''),
-                        'firstname': row.get('firstname', ''),
-                        'lastname': row.get('lastname', ''),
-                        'program': row.get('program', ''),
-                        'year': row.get('year', ''),
-                        'gender': row.get('gender', '')
-                    })
-                    
-                    if not is_valid:
-                        error_count += 1
-                        errors.append(f"Row {row_num}: {error_msg}")
-                        continue
-                    
-                    # check if ID already exists
-                    if row.get('id') in existing_ids:
-                        error_count += 1
-                        errors.append(f"Row {row_num}: Student ID {row.get('id')} already exists")
-                        continue
-                    
-                    rows_to_add.append(row)
-                    existing_ids.add(row.get('id'))
-                    imported_count += 1
-                
-                # append to CSV file
-                if rows_to_add:
-                    with open(FILES['student'], 'a', newline='', encoding='utf-8') as f:
-                        writer = csv.DictWriter(f, fieldnames=['id', 'firstname', 'lastname', 'program', 'year', 'gender'])
-                        for row in rows_to_add:
-                            writer.writerow({
-                                'id': row.get('id', ''),
-                                'firstname': row.get('firstname', ''),
-                                'lastname': row.get('lastname', ''),
-                                'program': row.get('program', ''),
-                                'year': row.get('year', ''),
-                                'gender': row.get('gender', '')
-                            })
-                    
-                    self.refresh_table()
-            
-            # show results
-            if error_count == 0:
-                self.controller.show_custom_dialog("Import Success", f"Successfully imported {imported_count} students!")
-            else:
-                error_msg = "\n".join(errors[:10])
-                if len(errors) > 10:
-                    error_msg += f"\n... and {len(errors) - 10} more errors"
-                self.controller.show_custom_dialog("Import Complete", f"Imported {imported_count} students.\n{error_count} errors:\n\n{error_msg}", dialog_type="warning")
-        
-        except Exception as e:
-            self.controller.show_custom_dialog("Import Error", f"Failed to import: {str(e)}", dialog_type="error")
-
-
 
 

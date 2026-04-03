@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('assets', 'assets'), ('config.py', '.'), ('students.csv', '.'), ('programs.csv', '.'), ('colleges.csv', '.'), ('users.csv', '.'), ('backend', 'backend'), ('frontend_ui', 'frontend_ui')]
+datas = [('assets', 'assets'), ('config.py', '.'), ('backend', 'backend'), ('frontend_ui', 'frontend_ui')]
 binaries = []
 hiddenimports = ['PIL', 'PIL._tkinter_finder', 'numpy', 'customtkinter']
 tmp_ret = collect_all('customtkinter')

@@ -1,16 +1,12 @@
 @echo off
 REM Build a single-file, windowed executable using PyInstaller
-REM Bundles all source code, assets, CSV seed data, and dependencies.
+REM Bundles all source code, assets, SQLite data support, and dependencies.
 REM Uses Python 3.13 directly to avoid NumPy/matplotlib DLL incompatibilities with Python 3.14+
 
 C:\Users\Calvyn\AppData\Local\Programs\Python\Python313\python.exe -m PyInstaller --noconfirm --onefile --windowed ^
     --icon "assets/nexo.ico" ^
     --add-data "assets;assets" ^
     --add-data "config.py;." ^
-    --add-data "students.csv;." ^
-    --add-data "programs.csv;." ^
-    --add-data "colleges.csv;." ^
-    --add-data "users.csv;." ^
     --add-data "backend;backend" ^
     --add-data "frontend_ui;frontend_ui" ^
     --hidden-import "PIL" ^

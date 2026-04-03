@@ -7,11 +7,11 @@ from tkinter import ttk
 
 from config import (
     FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR, 
-    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY, FILES
+    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY
 )
 from config import get_font
 from frontend_ui.ui import DepthCard, placeholder_image, setup_treeview_style, get_icon
-from backend import validate_college, save_csv
+from backend import validate_college
 
 
 class CollegesView(ctk.CTkFrame):
@@ -508,18 +508,11 @@ class CollegesView(ctk.CTkFrame):
             if not affected_programs and not affected_students:
                 warning_parts.append("\n\nNo programs or students will be affected.")
             if self.controller.show_custom_dialog("Confirm Delete", "".join(warning_parts), dialog_type="yesno"):
+                success, msg = self.controller.delete_college(college_code)
+                if not success:
+                    self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                    return
                 profile_window.destroy()
-                prog_codes = {p['code'] for p in self.controller.programs if p.get('college') == college_code}
-                for s in self.controller.students:
-                    if s.get('program') in prog_codes:
-                        s['program'] = ''
-                save_csv('student', self.controller.students)
-                for p in self.controller.programs:
-                    if p.get('college') == college_code:
-                        p['college'] = ''
-                save_csv('program', self.controller.programs)
-                self.controller.colleges.remove(college_obj)
-                save_csv('college', self.controller.colleges)
                 self.refresh_table()
                 self.controller.show_custom_dialog("Success", "College deleted successfully!")
 
@@ -666,8 +659,10 @@ class CollegesView(ctk.CTkFrame):
             if not ok:
                 self.controller.show_custom_dialog("Error", msg, dialog_type="error")
                 return
-            self.controller.colleges.append(new_col)
-            save_csv('college', self.controller.colleges)
+            success, msg = self.controller.add_college(new_col)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
             self.refresh_table()
             try:
                 self.refresh_sidebar()
@@ -732,17 +727,11 @@ class CollegesView(ctk.CTkFrame):
             warning_parts.append("\n\nNo programs or students will be affected.")
         
         if self.controller.show_custom_dialog("Confirm Delete", "".join(warning_parts), dialog_type="yesno"):
-            prog_codes = {p['code'] for p in self.controller.programs if p.get('college') == college['code']}
-            for s in self.controller.students:
-                if s.get('program') in prog_codes:
-                    s['program'] = ''
-            save_csv('student', self.controller.students)
-            for p in self.controller.programs:
-                if p.get('college') == college['code']:
-                    p['college'] = ''
-            save_csv('program', self.controller.programs)
-            self.controller.colleges.remove(college)
-            save_csv('college', self.controller.colleges)
+            success, msg = self.controller.delete_college(college_code)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+            self.controller.refresh_data()
             self.refresh_table()
             try:
                 self.refresh_sidebar()
@@ -825,11 +814,16 @@ class CollegesView(ctk.CTkFrame):
                 self.controller.show_custom_dialog("Validation Error", error_msg, dialog_type="error")
                 return
             
-            college['name'] = name_entry.get().strip().title()
-            save_csv('college', self.controller.colleges)
-            edit_window.destroy()
-            self.refresh_table()
-            self.controller.show_custom_dialog("Success", "College updated successfully!")
+            new_name = name_entry.get().strip().title()
+            success, msg = self.controller.update_college(college_code, {'name': new_name})
+            
+            if success:
+                edit_window.destroy()
+                self.controller.refresh_data()
+                self.refresh_table()
+                self.controller.show_custom_dialog("Success", "College updated successfully!")
+            else:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
         
         def delete():
             has_programs = any(p['college'] == college['code'] for p in self.controller.programs)
@@ -838,93 +832,17 @@ class CollegesView(ctk.CTkFrame):
                 return
             
             if self.controller.show_custom_dialog("Confirm Delete", f"Delete {college['code']}?", dialog_type="yesno"):
-                self.controller.colleges.remove(college)
-                save_csv('college', self.controller.colleges)
-                edit_window.destroy()
-                self.refresh_table()
-                self.controller.show_custom_dialog("Success", "College deleted successfully!")
+                success, msg = self.controller.delete_college(college_code)
+                if success:
+                    edit_window.destroy()
+                    self.controller.refresh_data()
+                    self.refresh_table()
+                    self.controller.show_custom_dialog("Success", "College deleted successfully!")
+                else:
+                    self.controller.show_custom_dialog("Error", msg, dialog_type="error")
         
         ctk.CTkButton(button_frame, text="Save Changes", command=save, height=40,
                      fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 5))
         ctk.CTkButton(button_frame, text="Delete", command=delete, height=40,
                      fg_color="#c41e3a", font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
-
-    def import_data(self):
-        """Import colleges from CSV file."""
-        from tkinter import filedialog
-        import csv
-        
-        file_path = filedialog.askopenfilename(
-            title="Select CSV file to import",
-            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
-        )
-        
-        if not file_path:
-            return
-        
-        try:
-            imported_count = 0
-            error_count = 0
-            errors = []
-            
-            with open(file_path, 'r', encoding='utf-8') as f:
-                reader = csv.DictReader(f)
-                existing_codes = set()
-                
-                # load existing codes
-                try:
-                    import csv as csv_module
-                    with open(FILES['college'], 'r', encoding='utf-8') as existing:
-                        existing_reader = csv_module.DictReader(existing)
-                        for row in existing_reader:
-                            existing_codes.add(row['code'])
-                except:
-                    pass
-                
-                rows_to_add = []
-                for row_num, row in enumerate(reader, start=2):
-                    # validate the row
-                    is_valid, error_msg = validate_college({
-                        'code': row.get('code', ''),
-                        'name': row.get('name', '')
-                    })
-                    
-                    if not is_valid:
-                        error_count += 1
-                        errors.append(f"Row {row_num}: {error_msg}")
-                        continue
-                    
-                    # check if code already exists
-                    if row.get('code') in existing_codes:
-                        error_count += 1
-                        errors.append(f"Row {row_num}: College code {row.get('code')} already exists")
-                        continue
-                    
-                    rows_to_add.append(row)
-                    existing_codes.add(row.get('code'))
-                    imported_count += 1
-                
-                # append to CSV file
-                if rows_to_add:
-                    with open(FILES['college'], 'a', newline='', encoding='utf-8') as f:
-                        writer = csv.DictWriter(f, fieldnames=['code', 'name'])
-                        for row in rows_to_add:
-                            writer.writerow({
-                                'code': row.get('code', ''),
-                                'name': row.get('name', '')
-                            })
-                    
-                    self.refresh_table()
-            
-            # show results
-            if error_count == 0:
-                self.controller.show_custom_dialog("Import Success", f"Successfully imported {imported_count} colleges!")
-            else:
-                error_msg = "\n".join(errors[:10])
-                if len(errors) > 10:
-                    error_msg += f"\n... and {len(errors) - 10} more errors"
-                self.controller.show_custom_dialog("Import Complete", f"Imported {imported_count} colleges.\n{error_count} errors:\n\n{error_msg}", dialog_type="warning")
-        
-        except Exception as e:
-            self.controller.show_custom_dialog("Import Error", f"Failed to import: {str(e)}", dialog_type="error")
 
