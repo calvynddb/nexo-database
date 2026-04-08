@@ -23,6 +23,7 @@ class ProgramsView(ctk.CTkFrame):
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
         self.grid_columnconfigure(1, weight=0)
+        self.multi_edit_mode = False
         self.sort_column = None
         self.sort_reverse = False
         self.column_names = {}  # store original column names
@@ -34,7 +35,16 @@ class ProgramsView(ctk.CTkFrame):
 
         setup_treeview_style()
         cols = ("#", "Code", "Program Name", "College", "Students")
-        self.tree = ttk.Treeview(table_container, columns=cols, show="headings", style="Treeview", height=12)
+        self.tree = ttk.Treeview(
+            table_container,
+            columns=cols,
+            show="tree headings",
+            style="Treeview",
+            height=12,
+            selectmode="extended",
+        )
+        self.tree.heading("#0", text="")
+        self.tree.column("#0", width=0, minwidth=0, stretch=False, anchor="center")
         
         # store original column names and add sort hint
         for c in cols:
@@ -47,6 +57,8 @@ class ProgramsView(ctk.CTkFrame):
         self.tree.bind("<Motion>", self._on_tree_motion)
         self.tree.bind("<Leave>", self._on_tree_leave)
         self.tree.bind("<ButtonRelease-1>", self.on_row_click)
+        self.tree.bind("<Double-1>", self.on_row_double_click)
+        self.tree.bind("<<TreeviewSelect>>", lambda _event: self._refresh_checkmarks())
         self.tree.tag_configure('odd', background="#1a1620")
         self.tree.tag_configure('even', background="#0f0d12")
         self.tree.tag_configure('hover', background="#6d5a8a", foreground="#ffffff")
@@ -96,7 +108,30 @@ class ProgramsView(ctk.CTkFrame):
         # right section: Entry count only
         right_ctrl = ctk.CTkFrame(ctrl, fg_color="transparent")
         right_ctrl.pack(side="right")
-        
+
+        self.bulk_edit_btn = ctk.CTkButton(
+            right_ctrl,
+            text="Edit Selected",
+            width=120,
+            height=30,
+            fg_color="#1d4ed8",
+            hover_color="#1e40af",
+            text_color="white",
+            font=get_font(12, True),
+            command=self.edit_selected_programs,
+        )
+
+        self.bulk_delete_btn = ctk.CTkButton(
+            right_ctrl,
+            text="Delete Selected",
+            width=130,
+            height=30,
+            fg_color="#c41e3a",
+            hover_color="#a31a31",
+            text_color="white",
+            font=get_font(12, True),
+            command=self.delete_selected_programs,
+        )
         # entry count label
         self.entry_count_label = ctk.CTkLabel(right_ctrl, text="Showing 0 of 0 entries", 
                                              font=get_font(13), text_color=TEXT_MUTED)
@@ -239,7 +274,14 @@ class ProgramsView(ctk.CTkFrame):
         end = start + per
         for idx, row in enumerate(self._last_page_items[start:end]):
             tag = 'even' if idx % 2 == 0 else 'odd'
-            self.tree.insert("", "end", values=row, tags=(tag,))
+            self.tree.insert(
+                "",
+                "end",
+                text=("☐" if self.multi_edit_mode else ""),
+                values=row,
+                tags=(tag,),
+            )
+        self._refresh_checkmarks()
         
         # update entry count - show range (e.g., "Showing 1-12 of 100 entries")
         if total > 0:
@@ -400,30 +442,99 @@ class ProgramsView(ctk.CTkFrame):
             self._last_hover = None
 
     def on_row_click(self, event):
+        if not self.multi_edit_mode:
+            return
         region = self.tree.identify_region(event.x, event.y)
-        if region in ('cell', 'tree'):
-            item = self.tree.identify_row(event.y)
-            if item:
-                row_data = self.tree.item(item)['values']
-                prog_code = row_data[1]  # program code
-                self._show_program_info(prog_code)
+        if region == "tree":
+            return "break"
+
+    def on_row_double_click(self, event):
+        region = self.tree.identify_region(event.x, event.y)
+        if self.multi_edit_mode and region == "tree":
+            return
+        if region not in ('cell', 'tree'):
+            return
+        item = self.tree.identify_row(event.y)
+        if not item:
+            return
+        row_data = self.tree.item(item).get('values', [])
+        if not row_data:
+            return
+        self._show_program_info(row_data[1])
 
     def filter_table(self, query):
+        self.apply_filters(query=query, advanced_filters=None)
+
+    def apply_filters(self, query: str = "", advanced_filters=None):
+        """Apply quick-search and advanced filters with AND semantics."""
+        query = (query or "").strip().lower()
+        advanced_filters = advanced_filters or {}
+
+        code_filter = str(advanced_filters.get("code", "")).strip().lower()
+        name_filter = str(advanced_filters.get("name", "")).strip().lower()
+        college_filter = str(advanced_filters.get("college", "")).strip().lower()
+
+        student_counts = {}
+        for student in self.controller.students:
+            prog_code = str(student.get('program', ''))
+            if not prog_code:
+                continue
+            student_counts[prog_code] = student_counts.get(prog_code, 0) + 1
+
         rows = []
         for idx, p in enumerate(self.controller.programs, 1):
-            if (query in p.get('name', '').lower() or 
-                query in p.get('code', '').lower() or
-                query in p.get('college', '').lower()):
-                student_count = len([s for s in self.controller.students if s.get('program') == p['code']])
-                rows.append((idx, p['code'], p['name'], p['college'], student_count))
+            code = str(p.get('code', ''))
+            name = str(p.get('name', ''))
+            college = str(p.get('college', ''))
+
+            code_l = code.lower()
+            name_l = name.lower()
+            college_l = college.lower()
+
+            if query and not (
+                query in name_l or
+                query in code_l or
+                query in college_l
+            ):
+                continue
+
+            if code_filter and code_filter not in code_l:
+                continue
+            if name_filter and name_filter not in name_l:
+                continue
+            if college_filter and college_filter != "any" and college_filter != college_l:
+                continue
+
+            student_count = student_counts.get(code, 0)
+            rows.append((idx, code, name, college, student_count))
+
         self._last_page_items = rows
         self.current_page = 1
         self._render_page()
 
     def on_column_click(self, event):
         region = self.tree.identify_region(event.x, event.y)
+        if self.multi_edit_mode and region == "tree":
+            item = self.tree.identify_row(event.y)
+            if item:
+                if item in self.tree.selection():
+                    self.tree.selection_remove(item)
+                else:
+                    self.tree.selection_add(item)
+                self._refresh_checkmarks()
+            return "break"
+
         if region == "heading":
             col = self.tree.identify_column(event.x)
+            if col == "#0":
+                if self.multi_edit_mode:
+                    visible = self.tree.get_children()
+                    if visible and all(item in self.tree.selection() for item in visible):
+                        self.tree.selection_remove(*visible)
+                    else:
+                        self.tree.selection_add(*visible)
+                    self._refresh_checkmarks()
+                return "break"
             try:
                 idx = int(col.replace('#', '')) - 1
                 col_id = self.tree['columns'][idx]
@@ -553,7 +664,7 @@ class ProgramsView(ctk.CTkFrame):
             affected_students = [s for s in self.controller.students if s.get('program', '') == prog_code]
             warning_parts = [f"Are you sure you want to delete program '{prog_code}'?"]
             if affected_students:
-                warning_parts.append(f"\n\n⚠ This will orphan {len(affected_students)} student(s) currently enrolled in this program.")
+                warning_parts.append(f"\n\n⚠ The program field will be cleared for {len(affected_students)} student(s) currently enrolled.")
             else:
                 warning_parts.append("\n\nNo students will be affected.")
             if self.controller.show_custom_dialog("Confirm Delete", "".join(warning_parts), dialog_type="yesno"):
@@ -562,7 +673,7 @@ class ProgramsView(ctk.CTkFrame):
                     profile_window.destroy()
                     self.controller.refresh_data()
                     self.refresh_table()
-                    self.controller.show_custom_dialog("Success", "Program deleted successfully!")
+                    self.controller.show_custom_dialog("Success", msg)
                 else:
                     self.controller.show_custom_dialog("Error", msg, dialog_type="error")
 
@@ -749,7 +860,190 @@ class ProgramsView(ctk.CTkFrame):
                 self._refresh_all_sidebars()
             except Exception:
                 pass
-            self.controller.show_custom_dialog("Success", "Program deleted successfully!")
+            self.controller.show_custom_dialog("Success", msg)
+
+    def delete_selected_programs(self):
+        """Delete multiple selected programs."""
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "You must log in to delete programs.")
+            return
+        if not self.multi_edit_mode:
+            self.controller.show_custom_dialog("Mode Required", "Enable Multi-Edit mode first.", dialog_type="warning")
+            return
+
+        selections = self.tree.selection()
+        if not selections:
+            self.controller.show_custom_dialog("No Selection", "Select one or more programs first.", dialog_type="warning")
+            return
+
+        program_codes = []
+        for item in selections:
+            row = self.tree.item(item).get('values', [])
+            if row:
+                program_codes.append(str(row[1]))
+
+        if not program_codes:
+            self.controller.show_custom_dialog("No Selection", "No valid program rows selected.", dialog_type="warning")
+            return
+
+        if not self.controller.show_custom_dialog(
+            "Confirm Bulk Delete",
+            f"Delete {len(program_codes)} selected program(s)?\nStudents in those programs will be unassigned.",
+            dialog_type="yesno",
+        ):
+            return
+
+        success_count = 0
+        failures = []
+        for program_code in program_codes:
+            success, msg = self.controller.delete_program(program_code)
+            if success:
+                success_count += 1
+            else:
+                failures.append(f"{program_code}: {msg}")
+
+        self.controller.refresh_data()
+        self.refresh_table()
+        try:
+            self.refresh_sidebar()
+            self._refresh_all_sidebars()
+        except Exception:
+            pass
+
+        if failures:
+            preview = "\n".join(failures[:5])
+            more = "" if len(failures) <= 5 else f"\n...and {len(failures) - 5} more"
+            self.controller.show_custom_dialog(
+                "Bulk Delete Complete",
+                f"Deleted {success_count}/{len(program_codes)} program(s).\n\nFailed:\n{preview}{more}",
+                dialog_type="warning",
+            )
+        else:
+            self.controller.show_custom_dialog("Success", f"Deleted {success_count} program(s) successfully.")
+
+    def edit_selected_programs(self):
+        """Bulk edit selected programs (safe fields only)."""
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "You must log in to edit programs.")
+            return
+        if not self.multi_edit_mode:
+            self.controller.show_custom_dialog("Mode Required", "Enable Multi-Edit mode first.", dialog_type="warning")
+            return
+
+        selections = self.tree.selection()
+        if not selections:
+            self.controller.show_custom_dialog("No Selection", "Select one or more programs first.", dialog_type="warning")
+            return
+
+        program_codes = []
+        for item in selections:
+            row = self.tree.item(item).get('values', [])
+            if row:
+                program_codes.append(str(row[1]))
+
+        if not program_codes:
+            self.controller.show_custom_dialog("No Selection", "No valid program rows selected.", dialog_type="warning")
+            return
+
+        modal = ctk.CTkToplevel(self)
+        modal.title("Bulk Edit Programs")
+        modal.geometry("460x260")
+        modal.configure(fg_color=BG_COLOR)
+        modal.attributes('-topmost', True)
+        modal.grab_set()
+        modal.focus_force()
+
+        modal.update_idletasks()
+        x = (modal.winfo_screenwidth() // 2) - (modal.winfo_width() // 2)
+        y = (modal.winfo_screenheight() // 2) - (modal.winfo_height() // 2)
+        modal.geometry(f"+{x}+{y}")
+
+        frame = ctk.CTkFrame(modal, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(frame, text=f"Bulk Edit {len(program_codes)} Program(s)", font=get_font(16, True)).pack(anchor="w", pady=(0, 12))
+        ctk.CTkLabel(frame, text="Set College", font=FONT_BOLD).pack(anchor="w")
+
+        college_values = [c['code'] for c in self.controller.colleges]
+        college_widget = StyledComboBox(frame, college_values)
+        if college_values:
+            college_widget.set(college_values[0])
+        college_widget.pack(fill="x", pady=(0, 16))
+
+        def save_bulk():
+            selected_college = college_widget.get().strip()
+            if not selected_college:
+                self.controller.show_custom_dialog("Validation Error", "Pick a target college.", dialog_type="error")
+                return
+
+            if not self.controller.show_custom_dialog(
+                "Confirm Bulk Edit",
+                (
+                    f"Apply this change to {len(program_codes)} program(s)?\n\n"
+                    f"- Set College to {selected_college}"
+                ),
+                dialog_type="yesno",
+            ):
+                return
+
+            success_count = 0
+            failures = []
+            for program_code in program_codes:
+                success, msg = self.controller.update_program(program_code, {'college': selected_college})
+                if success:
+                    success_count += 1
+                else:
+                    failures.append(f"{program_code}: {msg}")
+
+            self.controller.refresh_data()
+            self.refresh_table()
+            try:
+                self.refresh_sidebar()
+                self._refresh_all_sidebars()
+            except Exception:
+                pass
+            modal.destroy()
+
+            if failures:
+                preview = "\n".join(failures[:5])
+                more = "" if len(failures) <= 5 else f"\n...and {len(failures) - 5} more"
+                self.controller.show_custom_dialog(
+                    "Bulk Edit Complete",
+                    f"Updated {success_count}/{len(program_codes)} program(s).\n\nFailed:\n{preview}{more}",
+                    dialog_type="warning",
+                )
+            else:
+                self.controller.show_custom_dialog("Success", f"Updated {success_count} program(s) successfully.")
+
+        btn_row = ctk.CTkFrame(frame, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(6, 0))
+        ctk.CTkButton(btn_row, text="Apply Changes", command=save_bulk, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, fg_color="#555555", text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+    def _refresh_checkmarks(self):
+        for item in self.tree.get_children():
+            if not self.multi_edit_mode:
+                self.tree.item(item, text="")
+            else:
+                self.tree.item(item, text="☑" if item in self.tree.selection() else "☐")
+
+    def set_multi_edit_mode(self, enabled: bool):
+        self.multi_edit_mode = bool(enabled and self.controller.logged_in)
+        self.tree.configure(selectmode=("extended" if self.multi_edit_mode else "browse"))
+        self.tree.heading("#0", text=("✓" if self.multi_edit_mode else ""))
+        self.tree.column("#0", width=(38 if self.multi_edit_mode else 0), minwidth=0, stretch=False)
+        self.tree.selection_remove(*self.tree.selection())
+
+        if self.multi_edit_mode:
+            if not self.bulk_edit_btn.winfo_manager():
+                self.bulk_edit_btn.pack(side="left", padx=(0, 8), before=self.entry_count_label)
+            if not self.bulk_delete_btn.winfo_manager():
+                self.bulk_delete_btn.pack(side="left", padx=(0, 8), before=self.entry_count_label)
+        else:
+            self.bulk_edit_btn.pack_forget()
+            self.bulk_delete_btn.pack_forget()
+
+        self._refresh_checkmarks()
 
     def on_row_select(self, event):
         selection = self.tree.selection()
@@ -860,7 +1154,7 @@ class ProgramsView(ctk.CTkFrame):
                     edit_window.destroy()
                     self.controller.refresh_data()
                     self.refresh_table()
-                    self.controller.show_custom_dialog("Success", "Program deleted successfully!")
+                    self.controller.show_custom_dialog("Success", msg)
                 else:
                     self.controller.show_custom_dialog("Error", msg, dialog_type="error")
         

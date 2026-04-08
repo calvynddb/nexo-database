@@ -13,7 +13,7 @@ from config import (
     BG_COLOR, PANEL_COLOR, ACCENT_COLOR, TEXT_MUTED, BORDER_COLOR, 
     FONT_MAIN, FONT_BOLD, COLOR_PALETTE, get_font, TEXT_PRIMARY, THEME_MANAGER
 )
-from frontend_ui.ui import DepthCard, get_icon, get_main_logo
+from frontend_ui.ui import DepthCard, get_icon, get_main_logo, SoftLoadingOverlay
 from backend import create_backups
 from frontend_ui.auth import LoginFrame
 
@@ -25,6 +25,18 @@ class DashboardFrame(ctk.CTkFrame):
         super().__init__(parent, fg_color=BG_COLOR)
         self.controller = controller
         self.current_view = None
+        self.multi_edit_mode = False
+        self.filter_panel_visible = False
+        self.filter_vars = {}
+        self.view_filter_state = {}
+        self.view_search_state = {}
+        self._search_after_id = None
+        self._search_debounce_ms = 180
+        self._is_building_filter_controls = False
+        self._last_filter_signature_by_view = {}
+        self._filter_controls_view = None
+        self._filter_controls_data_signature = {}
+        self._filter_schema_cache = {}
 
         # lazy-import views here (not at module level) so matplotlib/numpy
         # are not loaded until the dashboard is actually constructed.
@@ -35,7 +47,8 @@ class DashboardFrame(ctk.CTkFrame):
         self._ProgramsView = ProgramsView
         self._CollegesView = CollegesView
         
-        self.grid_rowconfigure(2, weight=1)
+        self.grid_rowconfigure(2, weight=0)
+        self.grid_rowconfigure(3, weight=1)
         self.grid_columnconfigure(0, weight=1)
         
         # register as theme listener for dynamic updates
@@ -46,10 +59,12 @@ class DashboardFrame(ctk.CTkFrame):
 
         self.create_topbar()
         self.create_title_bar()
+        self.create_filter_panel()
+        self.loading_overlay = SoftLoadingOverlay(self, min_visible_ms=160)
 
         # main container with left content and right sidebar
         main_container = ctk.CTkFrame(self, fg_color="transparent")
-        main_container.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
+        main_container.grid(row=3, column=0, sticky="nsew", padx=0, pady=0)
         main_container.grid_rowconfigure(0, weight=1)
         main_container.grid_columnconfigure(0, weight=1)
         main_container.grid_columnconfigure(1, weight=0)
@@ -241,6 +256,44 @@ class DashboardFrame(ctk.CTkFrame):
                                         width=50, height=50, fg_color="#2a1f35",
                                         hover_color="#3a2f45", border_width=0, command=self.handle_refresh)
         self.refresh_btn.pack(side="left", padx=(0, 8))
+
+        self.clear_search_btn = ctk.CTkButton(
+            button_container,
+            text="X",
+            width=40,
+            height=50,
+            font=get_font(13, True),
+            fg_color="#3b3b3f",
+            text_color=TEXT_PRIMARY,
+            hover_color="#4b4b50",
+            command=self.clear_current_search,
+        )
+
+        self.multi_edit_btn = ctk.CTkButton(
+            button_container,
+            text="Multi-Edit: Off",
+            width=130,
+            height=50,
+            font=get_font(12, True),
+            fg_color="#3b3b3f",
+            text_color=TEXT_PRIMARY,
+            hover_color="#4b4b50",
+            command=self.toggle_multi_edit_mode,
+        )
+        self.multi_edit_btn.pack(side="left", padx=(0, 8))
+
+        self.filter_btn = ctk.CTkButton(
+            button_container,
+            text="Filters: Off",
+            width=120,
+            height=50,
+            font=get_font(12, True),
+            fg_color="#2a1f35",
+            text_color=TEXT_PRIMARY,
+            hover_color="#3a2f45",
+            command=self.toggle_filter_panel,
+        )
+        self.filter_btn.pack(side="left", padx=(0, 8))
         
         # add entry button
         self.add_btn = ctk.CTkButton(button_container, text="Add Entry", width=110, height=50,
@@ -249,6 +302,8 @@ class DashboardFrame(ctk.CTkFrame):
                                     hover_color="#7C3AED",
                                     command=self.handle_add_entry)
         self.add_btn.pack(side="left", padx=(0, 0))
+
+        self._update_clear_search_button()
         
         # disable add button initially (guest mode)
         self.update_button_states()
@@ -257,21 +312,541 @@ class DashboardFrame(ctk.CTkFrame):
         """Update button states based on login status."""
         if not self.controller.logged_in:
             self.add_btn.configure(state="disabled", fg_color="#555555")
+            self.multi_edit_btn.pack_forget()
+            self.set_multi_edit_mode(False)
         else:
             self.add_btn.configure(state="normal", fg_color=ACCENT_COLOR)
+            if not self.multi_edit_btn.winfo_manager():
+                self.multi_edit_btn.pack(side="left", padx=(0, 8), before=self.add_btn)
+            self.multi_edit_btn.configure(state="normal")
+
+    def create_filter_panel(self):
+        """Create a collapsible advanced filter panel for the active view."""
+        self.filter_panel_wrapper = ctk.CTkFrame(self, fg_color="transparent")
+        self.filter_panel_wrapper.grid(row=2, column=0, sticky="ew", padx=15, pady=(0, 6))
+        self.filter_panel_wrapper.grid_columnconfigure(0, weight=1)
+
+        filter_card = DepthCard(
+            self.filter_panel_wrapper,
+            fg_color=PANEL_COLOR,
+            corner_radius=10,
+            border_width=1,
+            border_color=BORDER_COLOR,
+        )
+        filter_card.pack(fill="x", expand=True)
+
+        content = ctk.CTkFrame(filter_card, fg_color="transparent")
+        content.pack(fill="x", padx=10, pady=8)
+
+        top_row = ctk.CTkFrame(content, fg_color="transparent")
+        top_row.pack(fill="x")
+
+        left_row = ctk.CTkFrame(top_row, fg_color="transparent")
+        left_row.pack(side="left")
+
+        self.filter_title_label = ctk.CTkLabel(
+            left_row,
+            text="Filters",
+            font=get_font(12, True),
+            text_color=TEXT_MUTED,
+        )
+        self.filter_title_label.pack(side="left", padx=(0, 8))
+
+        self.filter_summary_label = ctk.CTkLabel(
+            left_row,
+            text="0 active · 0 results",
+            font=get_font(11),
+            text_color="#8b8b95",
+        )
+        self.filter_summary_label.pack(side="left")
+
+        action_row = ctk.CTkFrame(top_row, fg_color="transparent")
+        action_row.pack(side="right")
+
+        self.apply_filters_btn = ctk.CTkButton(
+            action_row,
+            text="Apply",
+            width=82,
+            height=30,
+            font=get_font(11, True),
+            fg_color=ACCENT_COLOR,
+            text_color="white",
+            hover_color="#7C3AED",
+            command=self.apply_current_filters,
+        )
+        self.apply_filters_btn.pack(side="left", padx=(0, 6))
+
+        self.reset_filters_btn = ctk.CTkButton(
+            action_row,
+            text="Reset",
+            width=76,
+            height=30,
+            font=get_font(11, True),
+            fg_color="#44444a",
+            text_color="white",
+            hover_color="#56565f",
+            command=self.reset_current_filters,
+        )
+        self.reset_filters_btn.pack(side="left", padx=(0, 6))
+
+        self.hide_filters_btn = ctk.CTkButton(
+            action_row,
+            text="Hide",
+            width=70,
+            height=30,
+            font=get_font(11, True),
+            fg_color="#2a1f35",
+            text_color=TEXT_PRIMARY,
+            hover_color="#3a2f45",
+            command=self.toggle_filter_panel,
+        )
+        self.hide_filters_btn.pack(side="left")
+
+        self.filter_fields_frame = ctk.CTkFrame(content, fg_color="transparent")
+        self.filter_fields_frame.pack(fill="x", pady=(6, 0))
+
+        self.filter_panel_wrapper.grid_remove()
+
+    def toggle_filter_panel(self):
+        """Show or hide the advanced filter panel."""
+        self.filter_panel_visible = not self.filter_panel_visible
+
+        if self.filter_panel_visible:
+            self.filter_panel_wrapper.grid()
+            if self._needs_filter_rebuild(self.current_view):
+                self._run_with_loading("Preparing filters", lambda: self._build_filter_controls(self.current_view))
+            else:
+                self._build_filter_controls(self.current_view)
+        else:
+            self._persist_filter_state_from_widgets()
+            self.filter_panel_wrapper.grid_remove()
+
+        if self.current_view:
+            state = self._ensure_filter_state(self.current_view)
+            self._update_filter_button_state(self._active_filter_count(state))
+        else:
+            self._update_filter_button_state(0)
+
+    def _default_filter_state(self, view_class):
+        if view_class == self._StudentsView:
+            return {
+                "id": "",
+                "firstname": "",
+                "lastname": "",
+                "gender": "Any",
+                "year": "Any",
+                "program": "Any",
+                "college": "Any",
+            }
+        if view_class == self._ProgramsView:
+            return {
+                "code": "",
+                "name": "",
+                "college": "Any",
+            }
+        return {
+            "code": "",
+            "name": "",
+        }
+
+    def _get_filter_data_signature(self, view_class):
+        if not view_class:
+            return ("none",)
+        if view_class == self._StudentsView:
+            return (
+                "students",
+                id(self.controller.students), len(self.controller.students),
+                id(self.controller.programs), len(self.controller.programs),
+                id(self.controller.colleges), len(self.controller.colleges),
+            )
+        if view_class == self._ProgramsView:
+            return (
+                "programs",
+                id(self.controller.programs), len(self.controller.programs),
+                id(self.controller.colleges), len(self.controller.colleges),
+            )
+        return (
+            "colleges",
+            id(self.controller.colleges), len(self.controller.colleges),
+        )
+
+    def _needs_filter_rebuild(self, view_class) -> bool:
+        if not view_class:
+            return False
+        signature = self._get_filter_data_signature(view_class)
+        return not (
+            self._filter_controls_view == view_class
+            and self._filter_controls_data_signature.get(view_class) == signature
+            and bool(self.filter_vars)
+        )
+
+    def _run_with_loading(self, message: str, action):
+        self.loading_overlay.show(message)
+        self.update_idletasks()
+        try:
+            return action()
+        finally:
+            self.loading_overlay.hide()
+
+    def _get_filter_schema(self, view_class, data_signature=None):
+        cache_key = (view_class, data_signature)
+        if data_signature is not None and cache_key in self._filter_schema_cache:
+            return self._filter_schema_cache[cache_key]
+
+        if view_class == self._StudentsView:
+            years = sorted(
+                {str(s.get("year", "")).strip() for s in self.controller.students if str(s.get("year", "")).strip()},
+                key=lambda v: (0, int(v)) if v.isdigit() else (1, v),
+            )
+            program_codes = sorted(
+                {str(p.get("code", "")).strip() for p in self.controller.programs if str(p.get("code", "")).strip()}
+            )
+            college_codes = sorted(
+                {str(c.get("code", "")).strip() for c in self.controller.colleges if str(c.get("code", "")).strip()}
+            )
+            schema = [
+                {"key": "id", "label": "ID", "type": "entry", "placeholder": "Contains ID"},
+                {"key": "firstname", "label": "First Name", "type": "entry", "placeholder": "Contains first name"},
+                {"key": "lastname", "label": "Last Name", "type": "entry", "placeholder": "Contains last name"},
+                {"key": "gender", "label": "Gender", "type": "combo", "values": ["Any", "Male", "Female"]},
+                {"key": "year", "label": "Year", "type": "combo", "values": ["Any"] + years},
+                {"key": "program", "label": "Program", "type": "combo", "values": ["Any"] + program_codes},
+                {"key": "college", "label": "College", "type": "combo", "values": ["Any"] + college_codes},
+            ]
+            if data_signature is not None:
+                self._filter_schema_cache[cache_key] = schema
+            return schema
+
+        if view_class == self._ProgramsView:
+            college_codes = sorted(
+                {str(c.get("code", "")).strip() for c in self.controller.colleges if str(c.get("code", "")).strip()}
+            )
+            schema = [
+                {"key": "code", "label": "Code", "type": "entry", "placeholder": "Contains code"},
+                {"key": "name", "label": "Program Name", "type": "entry", "placeholder": "Contains program"},
+                {"key": "college", "label": "College", "type": "combo", "values": ["Any"] + college_codes},
+            ]
+            if data_signature is not None:
+                self._filter_schema_cache[cache_key] = schema
+            return schema
+
+        schema = [
+            {"key": "code", "label": "Code", "type": "entry", "placeholder": "Contains code"},
+            {"key": "name", "label": "College Name", "type": "entry", "placeholder": "Contains college"},
+        ]
+        if data_signature is not None:
+            self._filter_schema_cache[cache_key] = schema
+        return schema
+
+    def _ensure_filter_state(self, view_class):
+        defaults = self._default_filter_state(view_class)
+        state = dict(self.view_filter_state.get(view_class, {}))
+
+        for key, default in defaults.items():
+            state.setdefault(key, default)
+
+        for key in list(state.keys()):
+            if key not in defaults:
+                state.pop(key)
+
+        self.view_filter_state[view_class] = state
+        return state
+
+    def _active_filter_count(self, state: dict) -> int:
+        count = 0
+        for value in state.values():
+            text = str(value).strip()
+            if text and text.lower() != "any":
+                count += 1
+        return count
+
+    def _update_filter_summary(self, view_class):
+        if not hasattr(self, "filter_summary_label"):
+            return
+        if not view_class:
+            self.filter_summary_label.configure(text="0 active · 0 results")
+            self._update_filter_button_state(0)
+            return
+
+        state = self._ensure_filter_state(view_class)
+        active_count = self._active_filter_count(state)
+        result_count = self._current_result_count(view_class)
+        self.filter_summary_label.configure(text=f"{active_count} active · {result_count} results")
+        self._update_filter_button_state(active_count)
+
+    def _current_result_count(self, view_class) -> int:
+        if not view_class:
+            return 0
+
+        if view_class in self.views:
+            rows = getattr(self.views[view_class], "_last_page_items", None)
+            if rows is not None:
+                return len(rows)
+
+        if view_class == self._StudentsView:
+            return len(self.controller.students)
+        if view_class == self._ProgramsView:
+            return len(self.controller.programs)
+        if view_class == self._CollegesView:
+            return len(self.controller.colleges)
+        return 0
+
+    def _update_filter_button_state(self, active_count: int):
+        if not hasattr(self, "filter_btn"):
+            return
+
+        active_count = max(0, int(active_count))
+        if self.filter_panel_visible:
+            text = f"Filters: On ({active_count})" if active_count else "Filters: On"
+            self.filter_btn.configure(text=text, fg_color="#15803d", hover_color="#166534")
+            return
+
+        text = f"Filters: {active_count}" if active_count else "Filters: Off"
+        self.filter_btn.configure(text=text, fg_color="#2a1f35", hover_color="#3a2f45")
+
+    def _persist_search_state(self):
+        if not self.current_view or not hasattr(self, "search_entry"):
+            return
+        self.view_search_state[self.current_view] = self.search_entry.get()
+
+    def _restore_search_state(self, view_class):
+        if not hasattr(self, "search_entry"):
+            return
+
+        query = self.view_search_state.get(view_class, "")
+        self.search_entry.delete(0, "end")
+        if query:
+            self.search_entry.insert(0, query)
+        self._update_clear_search_button()
+
+    def _update_clear_search_button(self):
+        if not hasattr(self, "clear_search_btn") or not hasattr(self, "search_entry"):
+            return
+
+        has_query = bool(self.search_entry.get().strip())
+        if has_query and not self.clear_search_btn.winfo_manager():
+            self.clear_search_btn.pack(side="left", padx=(0, 8), before=self.refresh_btn)
+        elif not has_query and self.clear_search_btn.winfo_manager():
+            self.clear_search_btn.pack_forget()
+
+    def clear_current_search(self):
+        if not self.search_entry.get().strip():
+            return
+
+        self.search_entry.delete(0, "end")
+        self._persist_search_state()
+        self._update_clear_search_button()
+        self._schedule_filter_apply()
+
+    def _schedule_filter_apply(self):
+        if self._is_building_filter_controls:
+            return
+        if self._search_after_id:
+            try:
+                self.after_cancel(self._search_after_id)
+            except Exception:
+                pass
+        self._search_after_id = self.after(self._search_debounce_ms, lambda: self.apply_current_filters(force=False))
+
+    def _on_filter_input_changed(self, _event=None):
+        if self._is_building_filter_controls:
+            return
+        self._persist_filter_state_from_widgets()
+
+    def _on_filter_option_changed(self, _value=None):
+        if self._is_building_filter_controls:
+            return
+        self._persist_filter_state_from_widgets()
+
+    def _persist_filter_state_from_widgets(self):
+        if not self.filter_panel_visible:
+            return
+        if not self.current_view or not self.filter_vars:
+            return
+        state = self._ensure_filter_state(self.current_view)
+        for key, var in self.filter_vars.items():
+            value = var.get()
+            state[key] = value.strip() if isinstance(value, str) else value
+        self.view_filter_state[self.current_view] = state
+        self._update_filter_summary(self.current_view)
+
+    def _build_filter_controls(self, view_class):
+        if not hasattr(self, "filter_fields_frame"):
+            return
+
+        if not view_class:
+            self.filter_vars = {}
+            self.filter_title_label.configure(text="Filters")
+            self._filter_controls_view = None
+            self._update_filter_summary(None)
+            return
+
+        state = self._ensure_filter_state(view_class)
+        data_signature = self._get_filter_data_signature(view_class)
+        controls_unchanged = (
+            self._filter_controls_view == view_class
+            and self._filter_controls_data_signature.get(view_class) == data_signature
+            and bool(self.filter_vars)
+        )
+
+        label = "Students"
+        if view_class == self._ProgramsView:
+            label = "Programs"
+        elif view_class == self._CollegesView:
+            label = "Colleges"
+        self.filter_title_label.configure(text=f"Filters · {label}")
+
+        if controls_unchanged:
+            self._is_building_filter_controls = True
+            try:
+                for key, var in self.filter_vars.items():
+                    target = str(state.get(key, ""))
+                    if var.get() != target:
+                        var.set(target)
+            finally:
+                self._is_building_filter_controls = False
+            self._update_filter_summary(view_class)
+            return
+
+        self._is_building_filter_controls = True
+        try:
+            for child in self.filter_fields_frame.winfo_children():
+                child.destroy()
+            self.filter_vars = {}
+            schema = self._get_filter_schema(view_class, data_signature=data_signature)
+
+            max_columns = 5 if view_class == self._StudentsView else 4
+            for col in range(max_columns):
+                self.filter_fields_frame.grid_columnconfigure(col, weight=1)
+
+            for idx, field in enumerate(schema):
+                key = field["key"]
+                row = idx // max_columns
+                col = idx % max_columns
+
+                cell = ctk.CTkFrame(self.filter_fields_frame, fg_color="transparent")
+                cell.grid(row=row, column=col, sticky="ew", padx=4, pady=2)
+
+                row_frame = ctk.CTkFrame(cell, fg_color="transparent")
+                row_frame.pack(fill="x")
+
+                ctk.CTkLabel(
+                    row_frame,
+                    text=field["label"],
+                    font=get_font(10, True),
+                    text_color=TEXT_MUTED,
+                    width=56,
+                    anchor="w",
+                ).pack(side="left", padx=(0, 4))
+
+                value = str(state.get(key, ""))
+                var = tk.StringVar(value=value)
+                self.filter_vars[key] = var
+
+                if field["type"] == "combo":
+                    values = field.get("values", ["Any"])
+                    if value not in values:
+                        var.set(values[0])
+                    widget = ctk.CTkOptionMenu(
+                        row_frame,
+                        variable=var,
+                        values=values,
+                        height=30,
+                        fg_color="#2A1F3D",
+                        button_color="#4c1d95",
+                        button_hover_color="#5b21b6",
+                        text_color=TEXT_PRIMARY,
+                        font=get_font(11),
+                        command=self._on_filter_option_changed,
+                    )
+                    widget.pack(side="left", fill="x", expand=True)
+                else:
+                    widget = ctk.CTkEntry(
+                        row_frame,
+                        textvariable=var,
+                        placeholder_text=field.get("placeholder", field["label"]),
+                        height=30,
+                        fg_color="#2A1F3D",
+                        border_color=BORDER_COLOR,
+                        text_color=TEXT_PRIMARY,
+                        font=get_font(11),
+                    )
+                    widget.pack(side="left", fill="x", expand=True)
+                    widget.bind("<Return>", self.apply_current_filters)
+                    widget.bind("<KeyRelease>", self._on_filter_input_changed)
+        finally:
+            self._is_building_filter_controls = False
+
+        self._filter_controls_view = view_class
+        self._filter_controls_data_signature[view_class] = data_signature
+
+        self._update_filter_summary(view_class)
+
+    def apply_current_filters(self, _event=None, force: bool = False):
+        """Apply active quick search and advanced filters to the active view."""
+        self._search_after_id = None
+        if not self.current_view or self.current_view not in self.views:
+            return
+        if self._is_building_filter_controls and not force:
+            return
+
+        self._persist_search_state()
+        self._update_clear_search_button()
+        self._persist_filter_state_from_widgets()
+        query = self.search_entry.get().strip().lower()
+        filters = dict(self.view_filter_state.get(self.current_view, {}))
+
+        normalized_filters = tuple(sorted((str(k), str(v).strip().lower()) for k, v in filters.items()))
+        signature = (query, normalized_filters)
+        if not force and self._last_filter_signature_by_view.get(self.current_view) == signature:
+            self._update_filter_summary(self.current_view)
+            return
+
+        self._last_filter_signature_by_view[self.current_view] = signature
+        view = self.views[self.current_view]
+
+        if hasattr(view, "apply_filters"):
+            view.apply_filters(query=query, advanced_filters=filters)
+        elif query:
+            view.filter_table(query)
+        else:
+            view.refresh_table()
+
+        self._update_filter_summary(self.current_view)
+
+    def reset_current_filters(self):
+        """Reset advanced filters for the active view and re-apply search results."""
+        if not self.current_view:
+            return
+
+        defaults = self._default_filter_state(self.current_view)
+        self.view_filter_state[self.current_view] = dict(defaults)
+
+        for key, var in self.filter_vars.items():
+            var.set(str(defaults.get(key, "")))
+
+        self.apply_current_filters(force=True)
     
     def handle_refresh(self):
         """Refresh the current view's data from SQLite and update table + sidebar."""
-        self.controller.refresh_data()
-        if self.current_view and self.current_view in self.views:
-            view = self.views[self.current_view]
-            view.refresh_table()
-            if hasattr(view, 'refresh_sidebar'):
-                try:
-                    view.refresh_sidebar()
-                except Exception:
-                    pass
-            self.search_entry.delete(0, "end")
+        def _refresh():
+            self.controller.refresh_data()
+            self._filter_schema_cache.clear()
+            self._filter_controls_data_signature.clear()
+            self._filter_controls_view = None
+            if self.current_view and self.current_view in self.views:
+                view = self.views[self.current_view]
+                self._last_filter_signature_by_view.pop(self.current_view, None)
+                if self.filter_panel_visible:
+                    self._build_filter_controls(self.current_view)
+                self.apply_current_filters(force=True)
+                if hasattr(view, 'refresh_sidebar'):
+                    try:
+                        view.refresh_sidebar()
+                    except Exception:
+                        pass
+
+        self._run_with_loading("Refreshing view", _refresh)
 
     def handle_add_entry(self):
         """Handle add entry button - delegates to current view."""
@@ -289,6 +864,15 @@ class DashboardFrame(ctk.CTkFrame):
 
     def show_view(self, view_class):
         """Show a specific view."""
+        self._persist_search_state()
+        self._persist_filter_state_from_widgets()
+        if self._search_after_id:
+            try:
+                self.after_cancel(self._search_after_id)
+            except Exception:
+                pass
+            self._search_after_id = None
+
         view = self.views[view_class]
         view.tkraise()
         self.current_view = view_class
@@ -302,11 +886,25 @@ class DashboardFrame(ctk.CTkFrame):
         
         # update title and button label based on view
         self.update_title_card(view_class)
-        
-        # clear search on view change
-        self.search_entry.delete(0, "end")
-        
-        self.views[view_class].refresh_table()
+
+        self._restore_search_state(view_class)
+
+        if hasattr(self.views[view_class], "set_multi_edit_mode"):
+            self.views[view_class].set_multi_edit_mode(self.multi_edit_mode)
+
+        def _apply_view_state():
+            if self.filter_panel_visible:
+                self._build_filter_controls(view_class)
+            else:
+                self.filter_vars = {}
+                self._update_filter_summary(view_class)
+
+            self.apply_current_filters(force=True)
+
+        if self.filter_panel_visible and self._needs_filter_rebuild(view_class):
+            self._run_with_loading("Preparing view", _apply_view_state)
+        else:
+            _apply_view_state()
     
     def update_title_card(self, view_class):
         """Update title card label and button based on active view."""
@@ -318,14 +916,32 @@ class DashboardFrame(ctk.CTkFrame):
             self.title_label.configure(text="Colleges")
 
     def handle_search_dynamic(self, event):
-        """Filter current view's table based on search query."""
-        query = self.search_entry.get().strip().lower()
-        
-        if self.current_view:
-            if len(query) < 1:
-                self.views[self.current_view].refresh_table()
-            else:
-                self.views[self.current_view].filter_table(query)
+        """Debounced live search; advanced filters apply via Apply button or Enter."""
+        self._persist_search_state()
+        self._update_clear_search_button()
+        self._schedule_filter_apply()
+
+    def toggle_multi_edit_mode(self):
+        """Toggle admin-only multi-edit mode for table views."""
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "Multi-edit mode is only available for admins.")
+            return
+        self.set_multi_edit_mode(not self.multi_edit_mode)
+
+    def set_multi_edit_mode(self, enabled: bool):
+        """Apply multi-edit mode state and propagate to child views."""
+        enabled = bool(enabled and self.controller.logged_in)
+        self.multi_edit_mode = enabled
+
+        if enabled:
+            self.multi_edit_btn.configure(text="Multi-Edit: On", fg_color="#15803d", hover_color="#166534")
+        else:
+            self.multi_edit_btn.configure(text="Multi-Edit: Off", fg_color="#3b3b3f", hover_color="#4b4b50")
+
+        if hasattr(self, "views"):
+            for view in self.views.values():
+                if hasattr(view, "set_multi_edit_mode"):
+                    view.set_multi_edit_mode(enabled)
 
     def open_admin_panel(self):
         """Open admin management panel for registering admins and changing credentials."""
@@ -553,6 +1169,7 @@ class DashboardFrame(ctk.CTkFrame):
         if result:
             create_backups()
             self.controller.logged_in = False
+            self.set_multi_edit_mode(False)
             self.update_button_states()
             self.update_auth_button()
 

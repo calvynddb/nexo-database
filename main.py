@@ -76,13 +76,20 @@ class App(ctk.CTk):
             # Convert SQLAlchemy objects to dictionaries for frontend compatibility
             # (Phase 1: maintain existing frontend interface; Phase 2 will refactor to use ORM directly)
             self.colleges = [{'code': c.code, 'name': c.name} for c in colleges]
-            self.programs = [{'code': p.code, 'name': p.name, 'college': p.college.code} for p in programs]
+            self.programs = [
+                {
+                    'code': p.code,
+                    'name': p.name,
+                    'college': p.college.code if p.college else ''
+                }
+                for p in programs
+            ]
             self.students = [
                 {
                     'id': s.id,
                     'firstname': s.firstname,
                     'lastname': s.lastname,
-                    'program': s.program.code,
+                    'program': s.program.code if s.program else '',
                     'year': str(s.year),
                     'gender': s.gender
                 }
@@ -259,26 +266,31 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
             program = session.query(Program).filter(Program.code == program_code).first()
-            
+
             if not program:
-                session.close()
                 return False, "Program not found"
-            
-            # Check if program has students (prevent deletion if it does)
-            if program.students:
-                session.close()
-                return False, "Cannot delete program with enrolled students"
-            
+
+            affected_students_query = session.query(Student).filter(Student.program_id == program.id)
+            affected_students = affected_students_query.count()
+            for student in affected_students_query.all():
+                student.program_id = None
+
+            session.flush()
             session.delete(program)
             session.commit()
-            session.close()
             self.refresh_data()
-            return True, "Program deleted successfully"
+            return True, (
+                "Program deleted successfully. "
+                f"Cleared program assignment for {affected_students} student(s)."
+            )
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def add_program(self, program_data: dict) -> tuple[bool, str]:
         """Add a new program to the database and refresh cache.
@@ -358,26 +370,31 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
             college = session.query(College).filter(College.code == college_code).first()
-            
+
             if not college:
-                session.close()
                 return False, "College not found"
-            
-            # Check if college has programs (prevent deletion if it does)
-            if college.programs:
-                session.close()
-                return False, "Cannot delete college with active programs"
-            
+
+            affected_programs_query = session.query(Program).filter(Program.college_id == college.id)
+            affected_programs = affected_programs_query.count()
+            for program in affected_programs_query.all():
+                program.college_id = None
+
+            session.flush()
             session.delete(college)
             session.commit()
-            session.close()
             self.refresh_data()
-            return True, "College deleted successfully"
+            return True, (
+                "College deleted successfully. "
+                f"Cleared college assignment for {affected_programs} program(s)."
+            )
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def add_college(self, college_data: dict) -> tuple[bool, str]:
         """Add a new college to the database and refresh cache.

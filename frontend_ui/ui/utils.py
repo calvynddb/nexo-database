@@ -4,12 +4,94 @@ Utility functions for UI styling and assets.
 
 import customtkinter as ctk
 import tkinter as tk
+import time
 from pathlib import Path
 from config import PANEL_COLOR, TEXT_MUTED, BORDER_COLOR, PANEL_SELECTED, get_font, resource_path
 
 
 # icon cache to avoid reloading
 _icon_cache = {}
+
+
+class SoftLoadingOverlay:
+    """Reusable lightweight loading overlay with subtle animated feedback."""
+
+    def __init__(self, parent, min_visible_ms: int = 140):
+        self.parent = parent
+        self.min_visible_ms = max(0, int(min_visible_ms))
+        self._started_at = 0.0
+        self._pulse_after_id = None
+        self._pulse_step = 0
+        self._base_text = "Loading"
+
+        self._overlay = ctk.CTkFrame(parent, fg_color="#120f18", corner_radius=0)
+        self._overlay.grid_rowconfigure(0, weight=1)
+        self._overlay.grid_columnconfigure(0, weight=1)
+
+        panel = ctk.CTkFrame(
+            self._overlay,
+            fg_color="#1d1727",
+            corner_radius=12,
+            border_width=1,
+            border_color="#2a1f35",
+        )
+        panel.grid(row=0, column=0, padx=20, pady=20, sticky="")
+
+        self._label = ctk.CTkLabel(
+            panel,
+            text="Loading",
+            font=get_font(13, True),
+            text_color="#d8d5de",
+        )
+        self._label.pack(padx=18, pady=(14, 8))
+
+        self._bar = ctk.CTkProgressBar(panel, mode="indeterminate", width=180, progress_color="#6d5a8a")
+        self._bar.pack(padx=18, pady=(0, 14))
+
+    def show(self, message: str = "Loading"):
+        self._base_text = (message or "Loading").strip()
+        self._pulse_step = 0
+        self._started_at = time.perf_counter()
+        self._cancel_pulse()
+        self._label.configure(text=self._base_text)
+        self._overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
+        self._overlay.lift()
+        try:
+            self._bar.start()
+        except Exception:
+            pass
+        self._pulse()
+
+    def hide(self):
+        elapsed_ms = int((time.perf_counter() - self._started_at) * 1000)
+        remaining = max(0, self.min_visible_ms - elapsed_ms)
+
+        def _finish_hide():
+            self._cancel_pulse()
+            try:
+                self._bar.stop()
+            except Exception:
+                pass
+            self._overlay.place_forget()
+
+        if remaining > 0:
+            self.parent.after(remaining, _finish_hide)
+        else:
+            _finish_hide()
+
+    def _pulse(self):
+        dots = "." * ((self._pulse_step % 3) + 1)
+        self._label.configure(text=f"{self._base_text}{dots}")
+        self._pulse_step += 1
+        self._pulse_after_id = self.parent.after(220, self._pulse)
+
+    def _cancel_pulse(self):
+        if self._pulse_after_id:
+            try:
+                self.parent.after_cancel(self._pulse_after_id)
+            except Exception:
+                pass
+            self._pulse_after_id = None
 
 
 def show_dialog(parent, title, message, dialog_type="info", callback=None):

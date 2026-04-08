@@ -22,8 +22,8 @@ class College(Base):
     code = Column(String(10), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
 
-    # Relationship: one college has many programs
-    programs = relationship("Program", back_populates="college", cascade="all, delete-orphan")
+    # Keep child programs when a college is deleted; DB handles FK nulling.
+    programs = relationship("Program", back_populates="college", passive_deletes=True)
 
     def __repr__(self):
         return f"<College(id={self.id}, code={self.code}, name={self.name})>"
@@ -36,11 +36,11 @@ class Program(Base):
     id = Column(Integer, primary_key=True)
     code = Column(String(20), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
-    college_id = Column(Integer, ForeignKey("colleges.id"), nullable=False)
+    college_id = Column(Integer, ForeignKey("colleges.id", ondelete="SET NULL"), nullable=True)
 
     # Relationships
     college = relationship("College", back_populates="programs")
-    students = relationship("Student", back_populates="program", cascade="all, delete-orphan")
+    students = relationship("Student", back_populates="program", passive_deletes=True)
 
     def __repr__(self):
         return f"<Program(id={self.id}, code={self.code}, name={self.name}, college_id={self.college_id})>"
@@ -53,7 +53,7 @@ class Student(Base):
     id = Column(String(10), primary_key=True)  # e.g. "2023-0001"
     firstname = Column(String(100), nullable=False)
     lastname = Column(String(100), nullable=False)
-    program_id = Column(Integer, ForeignKey("programs.id"), nullable=False)
+    program_id = Column(Integer, ForeignKey("programs.id", ondelete="SET NULL"), nullable=True)
     year = Column(Integer, nullable=False)  # 1, 2, 3, or 4
     gender = Column(String(20), nullable=False)  # "Male", "Female", etc.
 
