@@ -6,7 +6,17 @@ import customtkinter as ctk
 import tkinter as tk
 import time
 from pathlib import Path
-from config import PANEL_COLOR, TEXT_MUTED, BORDER_COLOR, PANEL_SELECTED, get_font, resource_path
+from config import (
+    PANEL_COLOR,
+    TEXT_MUTED,
+    BORDER_COLOR,
+    PANEL_SELECTED,
+    ANIMATIONS_ENABLED,
+    REDUCED_MOTION,
+    get_font,
+    get_motion_duration,
+    resource_path,
+)
 
 
 # icon cache to avoid reloading
@@ -16,13 +26,16 @@ _icon_cache = {}
 class SoftLoadingOverlay:
     """Reusable lightweight loading overlay with subtle animated feedback."""
 
-    def __init__(self, parent, min_visible_ms: int = 140):
+    def __init__(self, parent, min_visible_ms: int = None):
         self.parent = parent
+        if min_visible_ms is None:
+            min_visible_ms = get_motion_duration("loading_overlay", 140)
         self.min_visible_ms = max(0, int(min_visible_ms))
         self._started_at = 0.0
         self._pulse_after_id = None
         self._pulse_step = 0
         self._base_text = "Loading"
+        self._pulse_interval_ms = 220 if not REDUCED_MOTION else 320
 
         self._overlay = ctk.CTkFrame(parent, fg_color="#120f18", corner_radius=0)
         self._overlay.grid_rowconfigure(0, weight=1)
@@ -56,11 +69,12 @@ class SoftLoadingOverlay:
         self._label.configure(text=self._base_text)
         self._overlay.place(relx=0, rely=0, relwidth=1, relheight=1)
         self._overlay.lift()
-        try:
-            self._bar.start()
-        except Exception:
-            pass
-        self._pulse()
+        if ANIMATIONS_ENABLED and not REDUCED_MOTION:
+            try:
+                self._bar.start()
+            except Exception:
+                pass
+            self._pulse()
 
     def hide(self):
         elapsed_ms = int((time.perf_counter() - self._started_at) * 1000)
@@ -83,7 +97,7 @@ class SoftLoadingOverlay:
         dots = "." * ((self._pulse_step % 3) + 1)
         self._label.configure(text=f"{self._base_text}{dots}")
         self._pulse_step += 1
-        self._pulse_after_id = self.parent.after(220, self._pulse)
+        self._pulse_after_id = self.parent.after(self._pulse_interval_ms, self._pulse)
 
     def _cancel_pulse(self):
         if self._pulse_after_id:
@@ -123,6 +137,86 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
     y = (dialog_window.winfo_screenheight() // 2) - (height // 2)
     dialog_window.geometry(f"+{x}+{y}")
 
+    def _animate_dialog_enter():
+        duration_ms = _resolve_motion_duration("dialog_open", None, fallback=160)
+        if duration_ms <= 0:
+            return
+
+        steps, tick_ms = _motion_steps(duration_ms, min_steps=3)
+        if steps <= 0:
+            return
+
+        offset = 8 if REDUCED_MOTION else 14
+        try:
+            dialog_window.attributes("-alpha", 0.0)
+        except Exception:
+            return
+
+        def _step(i=0):
+            t = i / steps
+            eased = 1.0 - ((1.0 - t) * (1.0 - t))
+            current_y = y + int((1.0 - eased) * offset)
+            try:
+                dialog_window.geometry(f"+{x}+{current_y}")
+            except Exception:
+                pass
+            try:
+                dialog_window.attributes("-alpha", min(1.0, eased))
+            except Exception:
+                pass
+            if i < steps:
+                dialog_window.after(tick_ms, lambda: _step(i + 1))
+
+        _step(0)
+
+    _is_closing = {"value": False}
+
+    def _close_dialog(value=None):
+        if _is_closing["value"]:
+            return
+        _is_closing["value"] = True
+        result[0] = value
+
+        def _finish_close():
+            try:
+                dialog_window.destroy()
+            except Exception:
+                pass
+            if callback and dialog_type == "yesno":
+                try:
+                    callback(value)
+                except Exception:
+                    pass
+
+        duration_ms = _resolve_motion_duration("dialog_close", None, fallback=120)
+        if duration_ms <= 0:
+            _finish_close()
+            return
+
+        steps, tick_ms = _motion_steps(duration_ms, min_steps=2)
+        if steps <= 0:
+            _finish_close()
+            return
+
+        try:
+            current_alpha = float(dialog_window.attributes("-alpha"))
+        except Exception:
+            current_alpha = 1.0
+
+        def _fade(i=0):
+            t = i / steps
+            alpha = max(0.0, current_alpha * (1.0 - t))
+            try:
+                dialog_window.attributes("-alpha", alpha)
+            except Exception:
+                pass
+            if i < steps:
+                dialog_window.after(tick_ms, lambda: _fade(i + 1))
+            else:
+                _finish_close()
+
+        _fade(0)
+
     # pick accent color by dialog type
     if dialog_type == "error":
         accent = "#c41e3a"
@@ -160,16 +254,10 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
 
     if dialog_type == "yesno":
         def _yes():
-            result[0] = True
-            if callback:
-                callback(True)
-            dialog_window.destroy()
+            _close_dialog(True)
 
         def _no():
-            result[0] = False
-            if callback:
-                callback(False)
-            dialog_window.destroy()
+            _close_dialog(False)
 
         ctk.CTkButton(button_frame, text="Yes", fg_color=accent, text_color="white",
                       hover_color="#7C3AED", font=get_font(13, True), height=36,
@@ -180,10 +268,13 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
     else:
         ctk.CTkButton(button_frame, text="OK", fg_color=accent, text_color="white",
                       hover_color="#7C3AED", font=get_font(13, True), height=36,
-                      command=dialog_window.destroy).pack(fill="x")
+                      command=_close_dialog).pack(fill="x")
 
-    dialog_window.protocol("WM_DELETE_WINDOW",
-                            lambda: (result.__setitem__(0, False), dialog_window.destroy()))
+    dialog_window.protocol(
+        "WM_DELETE_WINDOW",
+        lambda: _close_dialog(False if dialog_type == "yesno" else None),
+    )
+    _animate_dialog_enter()
     parent.wait_window(dialog_window)
     return result[0]
 
@@ -334,11 +425,47 @@ def _lerp(a, b, t):
     return a + (b - a) * t
 
 
-def animate_height(widget, target_height, duration=200):
+def _resolve_motion_duration(name: str, explicit_ms, fallback: int) -> int:
+    """Resolve animation duration with global motion settings applied."""
+    try:
+        if explicit_ms is None:
+            duration_ms = int(get_motion_duration(name, fallback))
+        else:
+            duration_ms = int(explicit_ms)
+    except Exception:
+        duration_ms = int(fallback)
+
+    duration_ms = max(0, duration_ms)
+    if not ANIMATIONS_ENABLED:
+        return 0
+    if REDUCED_MOTION:
+        return min(duration_ms, 110)
+    return duration_ms
+
+
+def _motion_steps(duration_ms: int, min_steps: int = 2):
+    """Return (steps, tick_ms) for smooth non-blocking after() animations."""
+    duration_ms = max(0, int(duration_ms))
+    if duration_ms <= 0:
+        return 0, 0
+    steps = max(int(min_steps), int(duration_ms // 15), 1)
+    tick_ms = max(8, int(duration_ms / steps))
+    return steps, tick_ms
+
+
+def animate_height(widget, target_height, duration=None):
     """Smoothly animate a widget's `height` option to target_height (px).
 
     Uses `after` and small steps to interpolate. Non-blocking.
     """
+    duration_ms = _resolve_motion_duration("panel_expand", duration, fallback=200)
+    if duration_ms <= 0:
+        try:
+            widget.configure(height=target_height)
+        except Exception:
+            pass
+        return
+
     try:
         start = widget.winfo_height()
     except Exception:
@@ -346,7 +473,7 @@ def animate_height(widget, target_height, duration=200):
             start = int(widget.cget('height') or 0)
         except Exception:
             start = 0
-    steps = max(2, int(duration // 15))
+    steps, tick_ms = _motion_steps(duration_ms, min_steps=2)
     delta = target_height - start
 
     def step(i=1):
@@ -357,13 +484,22 @@ def animate_height(widget, target_height, duration=200):
         except Exception:
             pass
         if i < steps:
-            widget.after(15, lambda: step(i + 1))
+            widget.after(tick_ms, lambda: step(i + 1))
 
     step()
 
 
-def animate_progress(bar, target, duration=400):
+def animate_progress(bar, target, duration=None):
     """Animate a CTkProgressBar `bar` from current value to `target` (0..1)."""
+    duration_ms = _resolve_motion_duration("loading_overlay", duration, fallback=400)
+    if duration_ms <= 0:
+        try:
+            bar.set(target)
+            bar._value = target
+        except Exception:
+            pass
+        return
+
     try:
         start = float(getattr(bar, '_value', bar._progress))
     except Exception:
@@ -371,7 +507,7 @@ def animate_progress(bar, target, duration=400):
             start = float(bar.get())
         except Exception:
             start = 0.0
-    steps = max(2, int(duration // 15))
+    steps, tick_ms = _motion_steps(duration_ms, min_steps=2)
 
     def step(i=1):
         t = i / steps
@@ -382,7 +518,7 @@ def animate_progress(bar, target, duration=400):
         except Exception:
             pass
         if i < steps:
-            bar.after(15, lambda: step(i + 1))
+            bar.after(tick_ms, lambda: step(i + 1))
 
     step()
 
@@ -392,12 +528,73 @@ def apply_button_hover(root, hover_scale=1.03):
     pass
 
 
-def fade_transition(app, new_frame, steps=12, on_shown=None):
+def animate_toplevel_in(window, x=None, y=None, duration_ms=None, offset=12):
+    """Animate a toplevel window with a subtle upward slide and fade-in."""
+    if x is None or y is None:
+        try:
+            window.update_idletasks()
+            x = (window.winfo_screenwidth() // 2) - (window.winfo_width() // 2)
+            y = (window.winfo_screenheight() // 2) - (window.winfo_height() // 2)
+            window.geometry(f"+{x}+{y}")
+        except Exception:
+            return
+
+    total_ms = _resolve_motion_duration("dialog_open", duration_ms, fallback=160)
+    if total_ms <= 0:
+        try:
+            window.attributes("-alpha", 1.0)
+        except Exception:
+            pass
+        try:
+            window.geometry(f"+{x}+{y}")
+        except Exception:
+            pass
+        return
+
+    steps, tick_ms = _motion_steps(total_ms, min_steps=3)
+    if steps <= 0:
+        return
+
+    offset_px = 8 if REDUCED_MOTION else max(0, int(offset))
+    try:
+        window.attributes("-alpha", 0.0)
+    except Exception:
+        return
+
+    def _step(i=0):
+        t = i / steps
+        eased = 1.0 - ((1.0 - t) * (1.0 - t))
+        current_y = y + int((1.0 - eased) * offset_px)
+        try:
+            window.geometry(f"+{x}+{current_y}")
+        except Exception:
+            pass
+        try:
+            window.attributes("-alpha", min(1.0, eased))
+        except Exception:
+            pass
+        if i < steps:
+            window.after(tick_ms, lambda: _step(i + 1))
+
+    # Start on idle so callers can finish building window contents before reveal.
+    try:
+        window.after_idle(lambda: _step(0) if window.winfo_exists() else None)
+    except Exception:
+        _step(0)
+
+
+def fade_transition(app, new_frame, steps=12, on_shown=None, duration_ms=None):
     """Animate a window alpha fade-out/fade-in while swapping to new_frame.
 
     Lifts new_frame at the midpoint (while the window is fully transparent),
     then fades back in. Calls on_shown() once the transition completes.
     """
+    total_duration_ms = _resolve_motion_duration(
+        "frame_transition",
+        duration_ms,
+        fallback=max(140, int(steps) * 20),
+    )
+
     def _swap():
         new_frame.lift()
         try:
@@ -412,13 +609,29 @@ def fade_transition(app, new_frame, steps=12, on_shown=None):
             except Exception:
                 pass
 
+    if total_duration_ms <= 0:
+        _swap()
+        try:
+            app.attributes("-alpha", 1.0)
+        except Exception:
+            pass
+        _call_shown()
+        return
+
+    phase_duration_ms = max(30, total_duration_ms // 2)
+    if steps is None or int(steps) <= 0:
+        steps, tick_ms = _motion_steps(phase_duration_ms, min_steps=3)
+    else:
+        steps = max(2, int(steps))
+        tick_ms = max(8, int(phase_duration_ms / steps))
+
     def fade_out(i=0):
         try:
             app.attributes('-alpha', max(0.0, 1.0 - i / steps))
         except Exception:
             pass
         if i < steps:
-            app.after(15, lambda: fade_out(i + 1))
+            app.after(tick_ms, lambda: fade_out(i + 1))
         else:
             _swap()
             fade_in(0)
@@ -429,8 +642,12 @@ def fade_transition(app, new_frame, steps=12, on_shown=None):
         except Exception:
             pass
         if i < steps:
-            app.after(15, lambda: fade_in(i + 1))
+            app.after(tick_ms, lambda: fade_in(i + 1))
         else:
+            try:
+                app.attributes("-alpha", 1.0)
+            except Exception:
+                pass
             _call_shown()
 
     fade_out(0)

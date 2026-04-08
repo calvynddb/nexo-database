@@ -11,9 +11,9 @@ import tkinter as tk
 
 from config import (
     BG_COLOR, PANEL_COLOR, ACCENT_COLOR, TEXT_MUTED, BORDER_COLOR, 
-    FONT_MAIN, FONT_BOLD, COLOR_PALETTE, get_font, TEXT_PRIMARY, THEME_MANAGER
+    FONT_MAIN, FONT_BOLD, COLOR_PALETTE, get_font, get_motion_duration, TEXT_PRIMARY, THEME_MANAGER
 )
-from frontend_ui.ui import DepthCard, get_icon, get_main_logo, SoftLoadingOverlay
+from frontend_ui.ui import DepthCard, get_icon, get_main_logo, SoftLoadingOverlay, animate_toplevel_in
 from backend import create_backups
 from frontend_ui.auth import LoginFrame
 
@@ -31,12 +31,13 @@ class DashboardFrame(ctk.CTkFrame):
         self.view_filter_state = {}
         self.view_search_state = {}
         self._search_after_id = None
-        self._search_debounce_ms = 180
+        self._search_debounce_ms = max(90, int(get_motion_duration("filter_apply", 180)))
         self._is_building_filter_controls = False
         self._last_filter_signature_by_view = {}
         self._filter_controls_view = None
         self._filter_controls_data_signature = {}
         self._filter_schema_cache = {}
+        self._filter_panel_after_id = None
 
         # lazy-import views here (not at module level) so matplotlib/numpy
         # are not loaded until the dashboard is actually constructed.
@@ -60,7 +61,10 @@ class DashboardFrame(ctk.CTkFrame):
         self.create_topbar()
         self.create_title_bar()
         self.create_filter_panel()
-        self.loading_overlay = SoftLoadingOverlay(self, min_visible_ms=160)
+        self.loading_overlay = SoftLoadingOverlay(
+            self,
+            min_visible_ms=max(40, int(get_motion_duration("loading_overlay", 130) * 0.5)),
+        )
 
         # main container with left content and right sidebar
         main_container = ctk.CTkFrame(self, fg_color="transparent")
@@ -268,6 +272,7 @@ class DashboardFrame(ctk.CTkFrame):
             hover_color="#4b4b50",
             command=self.clear_current_search,
         )
+        self.clear_search_btn.pack(side="left", padx=(0, 8), before=self.refresh_btn)
 
         self.multi_edit_btn = ctk.CTkButton(
             button_container,
@@ -409,23 +414,47 @@ class DashboardFrame(ctk.CTkFrame):
 
     def toggle_filter_panel(self):
         """Show or hide the advanced filter panel."""
-        self.filter_panel_visible = not self.filter_panel_visible
+        target_visible = not self.filter_panel_visible
+        if not target_visible:
+            # Persist while controls are still visible.
+            self._persist_filter_state_from_widgets()
+
+        self.filter_panel_visible = target_visible
 
         if self.filter_panel_visible:
-            self.filter_panel_wrapper.grid()
             if self._needs_filter_rebuild(self.current_view):
                 self._run_with_loading("Preparing filters", lambda: self._build_filter_controls(self.current_view))
             else:
                 self._build_filter_controls(self.current_view)
+            self._show_filter_panel_animated()
         else:
-            self._persist_filter_state_from_widgets()
-            self.filter_panel_wrapper.grid_remove()
+            self._hide_filter_panel_animated()
 
         if self.current_view:
             state = self._ensure_filter_state(self.current_view)
             self._update_filter_button_state(self._active_filter_count(state))
         else:
             self._update_filter_button_state(0)
+
+    def _cancel_filter_panel_animation(self):
+        if self._filter_panel_after_id:
+            try:
+                self.after_cancel(self._filter_panel_after_id)
+            except Exception:
+                pass
+            self._filter_panel_after_id = None
+
+    def _show_filter_panel_animated(self):
+        # Zero-gap first: show immediately so controls are visible as soon as ready.
+        self._cancel_filter_panel_animation()
+        self.filter_panel_wrapper.grid_propagate(True)
+        self.filter_panel_wrapper.grid()
+
+    def _hide_filter_panel_animated(self):
+        # Zero-gap first: remove immediately so table/content reflow has no dead interval.
+        self._cancel_filter_panel_animation()
+        self.filter_panel_wrapper.grid_remove()
+        self.filter_panel_wrapper.grid_propagate(True)
 
     def _default_filter_state(self, view_class):
         if view_class == self._StudentsView:
@@ -481,12 +510,29 @@ class DashboardFrame(ctk.CTkFrame):
         )
 
     def _run_with_loading(self, message: str, action):
-        self.loading_overlay.show(message)
-        self.update_idletasks()
+        shown = {"value": False}
+        show_after_id = {"value": None}
+
+        def _show_overlay():
+            shown["value"] = True
+            show_after_id["value"] = None
+            self.loading_overlay.show(message)
+
+        # Avoid flashing/gaps for fast operations.
+        show_delay_ms = max(60, int(get_motion_duration("loading_overlay", 130) * 0.7))
+        show_after_id["value"] = self.after(show_delay_ms, _show_overlay)
+
         try:
             return action()
         finally:
-            self.loading_overlay.hide()
+            if show_after_id["value"]:
+                try:
+                    self.after_cancel(show_after_id["value"])
+                except Exception:
+                    pass
+                show_after_id["value"] = None
+            if shown["value"]:
+                self.loading_overlay.hide()
 
     def _get_filter_schema(self, view_class, data_signature=None):
         cache_key = (view_class, data_signature)
@@ -508,7 +554,7 @@ class DashboardFrame(ctk.CTkFrame):
                 {"key": "id", "label": "ID", "type": "entry", "placeholder": "Contains ID"},
                 {"key": "firstname", "label": "First Name", "type": "entry", "placeholder": "Contains first name"},
                 {"key": "lastname", "label": "Last Name", "type": "entry", "placeholder": "Contains last name"},
-                {"key": "gender", "label": "Gender", "type": "combo", "values": ["Any", "Male", "Female"]},
+                {"key": "gender", "label": "Gender", "type": "combo", "values": ["Any", "Male", "Female", "Other"]},
                 {"key": "year", "label": "Year", "type": "combo", "values": ["Any"] + years},
                 {"key": "program", "label": "Program", "type": "combo", "values": ["Any"] + program_codes},
                 {"key": "college", "label": "College", "type": "combo", "values": ["Any"] + college_codes},
@@ -624,10 +670,23 @@ class DashboardFrame(ctk.CTkFrame):
             return
 
         has_query = bool(self.search_entry.get().strip())
-        if has_query and not self.clear_search_btn.winfo_manager():
+        if not self.clear_search_btn.winfo_manager():
             self.clear_search_btn.pack(side="left", padx=(0, 8), before=self.refresh_btn)
-        elif not has_query and self.clear_search_btn.winfo_manager():
-            self.clear_search_btn.pack_forget()
+
+        if has_query:
+            self.clear_search_btn.configure(
+                state="normal",
+                fg_color="#3b3b3f",
+                hover_color="#4b4b50",
+                text_color=TEXT_PRIMARY,
+            )
+        else:
+            self.clear_search_btn.configure(
+                state="disabled",
+                fg_color="#2a1f35",
+                hover_color="#2a1f35",
+                text_color="#7a7a84",
+            )
 
     def clear_current_search(self):
         if not self.search_entry.get().strip():
@@ -958,6 +1017,7 @@ class DashboardFrame(ctk.CTkFrame):
         x = (panel.winfo_screenwidth() // 2) - (panel.winfo_width() // 2)
         y = (panel.winfo_screenheight() // 2) - (panel.winfo_height() // 2)
         panel.geometry(f"+{x}+{y}")
+        animate_toplevel_in(panel, x=x, y=y, duration_ms=get_motion_duration("dialog_open", 160))
 
         container = ctk.CTkFrame(panel, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
@@ -997,8 +1057,12 @@ class DashboardFrame(ctk.CTkFrame):
             if pwd != conf:
                 self.controller.show_custom_dialog("Error", "Passwords do not match.", dialog_type="error")
                 return
-            if len(pwd) < 6:
-                self.controller.show_custom_dialog("Error", "Password must be at least 6 characters.", dialog_type="error")
+
+            from backend import validate_password
+
+            ok, validation_msg = validate_password(pwd)
+            if not ok:
+                self.controller.show_custom_dialog("Error", validation_msg, dialog_type="error")
                 return
             
             success, msg = self.controller.create_user(uname, pwd)
@@ -1041,8 +1105,12 @@ class DashboardFrame(ctk.CTkFrame):
             if new_pwd != conf:
                 self.controller.show_custom_dialog("Error", "New passwords do not match.", dialog_type="error")
                 return
-            if len(new_pwd) < 6:
-                self.controller.show_custom_dialog("Error", "Password must be at least 6 characters.", dialog_type="error")
+
+            from backend import validate_password
+
+            ok, validation_msg = validate_password(new_pwd)
+            if not ok:
+                self.controller.show_custom_dialog("Error", validation_msg, dialog_type="error")
                 return
             
             success, msg = self.controller.change_password(uname, old_pwd, new_pwd)
@@ -1071,6 +1139,12 @@ class DashboardFrame(ctk.CTkFrame):
         x = (settings_window.winfo_screenwidth() // 2) - (settings_window.winfo_width() // 2)
         y = (settings_window.winfo_screenheight() // 2) - (settings_window.winfo_height() // 2)
         settings_window.geometry(f"+{x}+{y}")
+        animate_toplevel_in(
+            settings_window,
+            x=x,
+            y=y,
+            duration_ms=get_motion_duration("dialog_open", 160),
+        )
         
         container = ctk.CTkFrame(settings_window, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=16, pady=16)

@@ -16,8 +16,9 @@ if getattr(sys, 'frozen', False):
 
 import customtkinter as ctk
 from config import BG_COLOR, WINDOW_WIDTH, WINDOW_HEIGHT, resource_path
-from backend import init_files, get_session
+from backend import get_session, hash_password, init_files, verify_password
 from backend.models import College, Program, Student, User
+from backend.validators import validate_college, validate_password, validate_program, validate_student
 from frontend_ui.auth import LoginFrame
 from frontend_ui.dashboard import DashboardFrame
 from frontend_ui.ui.utils import show_dialog
@@ -119,37 +120,60 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
             student = session.query(Student).filter(Student.id == student_id).first()
             
             if not student:
-                session.close()
                 return False, "Student not found"
+
+            clean_updates = {}
+            for key, value in (updates or {}).items():
+                if key in ('firstname', 'lastname', 'gender', 'year', 'program'):
+                    clean_updates[key] = str(value).strip() if value is not None else ""
+
+            existing_program_code = student.program.code if student.program else ""
+            candidate = {
+                'id': student.id,
+                'firstname': clean_updates.get('firstname', student.firstname),
+                'lastname': clean_updates.get('lastname', student.lastname),
+                'gender': clean_updates.get('gender', student.gender),
+                'year': clean_updates.get('year', str(student.year)),
+                'program': clean_updates.get('program', existing_program_code),
+            }
+            ok, msg = validate_student(candidate, require_program=False)
+            if not ok:
+                return False, msg
             
             # Handle program code -> program_id lookup
-            if 'program' in updates:
-                program = session.query(Program).filter(Program.code == updates['program']).first()
-                if not program:
-                    session.close()
-                    return False, f"Program '{updates['program']}' not found"
-                student.program_id = program.id
-                updates.pop('program')
+            if 'program' in clean_updates:
+                program_code = clean_updates['program']
+                if program_code:
+                    program = session.query(Program).filter(Program.code == program_code).first()
+                    if not program:
+                        return False, f"Program '{program_code}' not found"
+                    student.program_id = program.id
+                else:
+                    student.program_id = None
             
             # Update allowed fields
-            for key, value in updates.items():
-                if key in ('firstname', 'lastname', 'gender', 'year'):
-                    if key == 'year':
-                        setattr(student, key, int(value))
-                    else:
-                        setattr(student, key, value)
+            if 'firstname' in clean_updates:
+                student.firstname = clean_updates['firstname'].title()
+            if 'lastname' in clean_updates:
+                student.lastname = clean_updates['lastname'].title()
+            if 'gender' in clean_updates:
+                student.gender = clean_updates['gender'].title()
+            if 'year' in clean_updates:
+                student.year = int(clean_updates['year'])
             
             session.commit()
-            session.close()
             self.refresh_data()
             return True, "Student updated successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def delete_student(self, student_id: str) -> tuple[bool, str]:
         """Delete a student from the database and refresh cache.
@@ -185,38 +209,50 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
+            candidate = {
+                'id': str(student_data.get('id', '')).strip(),
+                'firstname': str(student_data.get('firstname', '')).strip(),
+                'lastname': str(student_data.get('lastname', '')).strip(),
+                'gender': str(student_data.get('gender', '')).strip(),
+                'year': str(student_data.get('year', '')).strip(),
+                'program': str(student_data.get('program', '')).strip(),
+            }
+
+            ok, msg = validate_student(candidate, require_program=True)
+            if not ok:
+                return False, msg
             
             # Check if ID already exists
-            existing = session.query(Student).filter(Student.id == student_data['id']).first()
+            existing = session.query(Student).filter(Student.id == candidate['id']).first()
             if existing:
-                session.close()
                 return False, "Student ID already exists"
             
             # Look up program by code
-            program = session.query(Program).filter(Program.code == student_data['program']).first()
+            program = session.query(Program).filter(Program.code == candidate['program']).first()
             if not program:
-                session.close()
-                return False, f"Program '{student_data['program']}' not found"
+                return False, f"Program '{candidate['program']}' not found"
             
             # Create new student
             new_student = Student(
-                id=student_data['id'],
-                firstname=student_data['firstname'],
-                lastname=student_data['lastname'],
+                id=candidate['id'],
+                firstname=candidate['firstname'].title(),
+                lastname=candidate['lastname'].title(),
                 program_id=program.id,
-                year=int(student_data['year']),
-                gender=student_data['gender']
+                year=int(candidate['year']),
+                gender=candidate['gender'].title()
             )
             
             session.add(new_student)
             session.commit()
-            session.close()
             self.refresh_data()
             return True, "Student added successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def update_program(self, program_code: str, updates: dict) -> tuple[bool, str]:
         """Update a program in the database and refresh cache.
@@ -228,34 +264,51 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
             program = session.query(Program).filter(Program.code == program_code).first()
             
             if not program:
-                session.close()
                 return False, "Program not found"
+
+            clean_updates = {}
+            for key, value in (updates or {}).items():
+                if key in ('name', 'college'):
+                    clean_updates[key] = str(value).strip() if value is not None else ""
+
+            existing_college_code = program.college.code if program.college else ""
+            candidate = {
+                'code': program.code,
+                'name': clean_updates.get('name', program.name),
+                'college': clean_updates.get('college', existing_college_code),
+            }
+            ok, msg = validate_program(candidate, require_college=False)
+            if not ok:
+                return False, msg
             
             # Handle college code -> college_id lookup
-            if 'college' in updates:
-                college = session.query(College).filter(College.code == updates['college']).first()
-                if not college:
-                    session.close()
-                    return False, f"College '{updates['college']}' not found"
-                program.college_id = college.id
-                updates.pop('college')
+            if 'college' in clean_updates:
+                college_code = clean_updates['college']
+                if college_code:
+                    college = session.query(College).filter(College.code == college_code).first()
+                    if not college:
+                        return False, f"College '{college_code}' not found"
+                    program.college_id = college.id
+                else:
+                    program.college_id = None
             
             # Update allowed fields
-            for key, value in updates.items():
-                if key in ('name',):
-                    setattr(program, key, value)
+            if 'name' in clean_updates:
+                program.name = clean_updates['name'].title()
             
             session.commit()
-            session.close()
             self.refresh_data()
             return True, "Program updated successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def delete_program(self, program_code: str) -> tuple[bool, str]:
         """Delete a program from the database and refresh cache.
@@ -301,35 +354,44 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
+            candidate = {
+                'code': str(program_data.get('code', '')).strip(),
+                'name': str(program_data.get('name', '')).strip(),
+                'college': str(program_data.get('college', '')).strip(),
+            }
+
+            ok, msg = validate_program(candidate, require_college=True)
+            if not ok:
+                return False, msg
             
             # Check if code already exists
-            existing = session.query(Program).filter(Program.code == program_data['code']).first()
+            existing = session.query(Program).filter(Program.code == candidate['code']).first()
             if existing:
-                session.close()
                 return False, "Program code already exists"
             
             # Look up college by code
-            college = session.query(College).filter(College.code == program_data['college']).first()
+            college = session.query(College).filter(College.code == candidate['college']).first()
             if not college:
-                session.close()
-                return False, f"College '{program_data['college']}' not found"
+                return False, f"College '{candidate['college']}' not found"
             
             # Create new program
             new_program = Program(
-                code=program_data['code'],
-                name=program_data['name'],
+                code=candidate['code'],
+                name=candidate['name'].title(),
                 college_id=college.id
             )
             
             session.add(new_program)
             session.commit()
-            session.close()
             self.refresh_data()
             return True, "Program added successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def update_college(self, college_code: str, updates: dict) -> tuple[bool, str]:
         """Update a college in the database and refresh cache.
@@ -341,25 +403,34 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
             college = session.query(College).filter(College.code == college_code).first()
             
             if not college:
-                session.close()
                 return False, "College not found"
+
+            clean_name = str((updates or {}).get('name', college.name) or '').strip()
+            candidate = {
+                'code': college.code,
+                'name': clean_name,
+            }
+            ok, msg = validate_college(candidate)
+            if not ok:
+                return False, msg
             
             # Update allowed fields
-            for key, value in updates.items():
-                if key in ('name',):
-                    setattr(college, key, value)
+            if 'name' in (updates or {}):
+                college.name = clean_name.title()
             
             session.commit()
-            session.close()
             self.refresh_data()
             return True, "College updated successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def delete_college(self, college_code: str) -> tuple[bool, str]:
         """Delete a college from the database and refresh cache.
@@ -405,28 +476,37 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            session = get_session()
+            candidate = {
+                'code': str(college_data.get('code', '')).strip(),
+                'name': str(college_data.get('name', '')).strip(),
+            }
+
+            ok, msg = validate_college(candidate)
+            if not ok:
+                return False, msg
             
             # Check if code already exists
-            existing = session.query(College).filter(College.code == college_data['code']).first()
+            existing = session.query(College).filter(College.code == candidate['code']).first()
             if existing:
-                session.close()
                 return False, "College code already exists"
             
             # Create new college
             new_college = College(
-                code=college_data['code'],
-                name=college_data['name']
+                code=candidate['code'],
+                name=candidate['name'].title()
             )
             
             session.add(new_college)
             session.commit()
-            session.close()
             self.refresh_data()
             return True, "College added successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def create_user(self, username: str, password: str) -> tuple[bool, str]:
         """Create a new user in the database.
@@ -438,16 +518,18 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            from backend.auth import hash_password
-            from backend.models import User
-            
-            session = get_session()
+            username = str(username or '').strip()
+            ok, msg = validate_password(password)
+            if not ok:
+                return False, msg
+            if not username:
+                return False, "Username is required"
             
             # Check if user already exists
             existing = session.query(User).filter(User.username == username).first()
             if existing:
-                session.close()
                 return False, f"Username '{username}' already exists"
             
             # Hash password with salt
@@ -462,10 +544,12 @@ class App(ctk.CTk):
             
             session.add(new_user)
             session.commit()
-            session.close()
             return True, f"User '{username}' created successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
     def change_password(self, username: str, old_password: str, new_password: str) -> tuple[bool, str]:
         """Change a user's password.
@@ -478,21 +562,25 @@ class App(ctk.CTk):
         Returns:
             (success: bool, message: str)
         """
+        session = get_session()
         try:
-            from backend.auth import hash_password, verify_password
-            from backend.models import User
-            
-            session = get_session()
+            username = str(username or '').strip()
+            old_password = str(old_password or '')
+            ok, msg = validate_password(new_password)
+            if not ok:
+                return False, msg
+            if not username:
+                return False, "Username is required"
+            if not old_password:
+                return False, "Current password is required"
             
             # Find user
             user = session.query(User).filter(User.username == username).first()
             if not user:
-                session.close()
                 return False, f"User '{username}' not found"
             
             # Verify old password
             if not verify_password(old_password, user.salt, user.password):
-                session.close()
                 return False, "Current password is incorrect"
             
             # Hash new password
@@ -501,10 +589,12 @@ class App(ctk.CTk):
             user.password = pw_hash
             
             session.commit()
-            session.close()
             return True, "Password changed successfully"
         except Exception as e:
+            session.rollback()
             return False, f"Error: {str(e)}"
+        finally:
+            session.close()
 
 
     def _build_frames(self):

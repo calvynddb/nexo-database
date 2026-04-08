@@ -56,6 +56,40 @@ PANEL_SELECTED = "#2d1f45"  # subtle purple selection highlight
 WINDOW_WIDTH = 1400
 WINDOW_HEIGHT = 940
 
+# --- motion / animation settings ---
+# Keep motion subtle by default for smoother perceived performance.
+ANIMATIONS_ENABLED = True
+REDUCED_MOTION = False
+MOTION_DURATIONS_MS = {
+    "frame_transition": 150,
+    "dialog_open": 125,
+    "dialog_close": 100,
+    "panel_expand": 145,
+    "loading_overlay": 130,
+    "filter_apply": 140,
+    # legacy aliases (kept for compatibility with older call sites)
+    "dialog_enter": 125,
+    "dialog_exit": 100,
+    "panel_reveal": 145,
+    "overlay_min_visible": 130,
+}
+
+
+def get_motion_duration(name: str, fallback: int = 140) -> int:
+    """Return an effective duration for a named motion token in milliseconds."""
+    if not ANIMATIONS_ENABLED:
+        return 0
+
+    try:
+        duration = int(MOTION_DURATIONS_MS.get(name, fallback))
+    except Exception:
+        duration = int(fallback)
+
+    if REDUCED_MOTION:
+        return max(60, duration // 2)
+
+    return max(0, duration)
+
 # --- chart colors --- subtle purple palette
 COLOR_PALETTE = [
     '#5a4a7a',  # subtle muted purple (primary)

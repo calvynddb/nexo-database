@@ -154,33 +154,16 @@ class LoginFrame(ctk.CTkFrame):
             if password != confirm:
                 self.controller.show_custom_dialog("Error", "Passwords do not match", dialog_type="error")
                 return
-            
-            if len(password) < 6:
-                self.controller.show_custom_dialog("Error", "Password must be at least 6 characters", dialog_type="error")
+
+            from backend import validate_password
+            ok, msg = validate_password(password)
+            if not ok:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
                 return
-            
-            # check for duplicate username and create new user
-            try:
-                from backend import get_session, hash_password
-                from backend.models import User
-                
-                session = get_session()
-                
-                # Check if username already exists
-                existing = session.query(User).filter(User.username == username).first()
-                if existing:
-                    session.close()
-                    self.controller.show_custom_dialog("Error", f"Username '{username}' is already taken.", dialog_type="error")
-                    return
-                
-                # Create and save new user
-                salt, pw_hash = hash_password(password)
-                new_user = User(username=username, salt=salt, password=pw_hash)
-                session.add(new_user)
-                session.commit()
-                session.close()
-            except Exception as e:
-                self.controller.show_custom_dialog("Error", f"Could not save user: {e}", dialog_type="error")
+
+            success, msg = self.controller.create_user(username, password)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
                 return
             
             self.controller.show_custom_dialog("Success", "Administrator registered successfully! Please log in.")

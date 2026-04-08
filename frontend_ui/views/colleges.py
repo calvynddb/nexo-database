@@ -10,7 +10,7 @@ from config import (
     TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY
 )
 from config import get_font
-from frontend_ui.ui import DepthCard, placeholder_image, setup_treeview_style, get_icon
+from frontend_ui.ui import DepthCard, placeholder_image, setup_treeview_style, get_icon, animate_toplevel_in
 from backend import validate_college
 
 
@@ -206,23 +206,30 @@ class CollegesView(ctk.CTkFrame):
         self._last_hover = None
 
     def _render_page(self):
-        for item in self.tree.get_children():
-            self.tree.delete(item)
         total = len(self._last_page_items)
         per = self.page_size
         total_pages = max(1, (total + per - 1) // per)
         self.current_page = min(self.current_page, total_pages)
         start = (self.current_page - 1) * per
-        end = start + per
-        for idx, row in enumerate(self._last_page_items[start:end]):
+        end = min(start + per, total)
+        page_rows = self._last_page_items[start:end]
+
+        tree_items = list(self.tree.get_children())
+        while len(tree_items) < len(page_rows):
+            tree_items.append(self.tree.insert("", "end"))
+
+        for idx, row in enumerate(page_rows):
             tag = 'even' if idx % 2 == 0 else 'odd'
-            self.tree.insert(
-                "",
-                "end",
+            self.tree.item(
+                tree_items[idx],
                 text=("☐" if self.multi_edit_mode else ""),
                 values=row,
                 tags=(tag,),
             )
+
+        for stale in tree_items[len(page_rows):]:
+            self.tree.delete(stale)
+
         self._refresh_checkmarks()
         
         # update entry count - show range (e.g., "Showing 1-12 of 100 entries")
@@ -441,6 +448,7 @@ class CollegesView(ctk.CTkFrame):
         x = (dlg.winfo_screenwidth() // 2) - (dlg.winfo_width() // 2)
         y = (dlg.winfo_screenheight() // 2) - (dlg.winfo_height() // 2)
         dlg.geometry(f"+{x}+{y}")
+        animate_toplevel_in(dlg, x=x, y=y)
         
         container = ctk.CTkFrame(dlg, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=16, pady=16)
@@ -487,6 +495,7 @@ class CollegesView(ctk.CTkFrame):
         x = (profile_window.winfo_screenwidth() // 2) - (profile_window.winfo_width() // 2)
         y = (profile_window.winfo_screenheight() // 2) - (profile_window.winfo_height() // 2)
         profile_window.geometry(f"+{x}+{y}")
+        animate_toplevel_in(profile_window, x=x, y=y)
 
         container = ctk.CTkFrame(profile_window, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
@@ -699,6 +708,7 @@ class CollegesView(ctk.CTkFrame):
         x = (modal.winfo_screenwidth() // 2) - (modal.winfo_width() // 2)
         y = (modal.winfo_screenheight() // 2) - (modal.winfo_height() // 2)
         modal.geometry(f"450x{height}+{x}+{y}")
+        animate_toplevel_in(modal, x=x, y=y)
         
         form_frame = ctk.CTkFrame(modal, fg_color="transparent")
         form_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -925,6 +935,7 @@ class CollegesView(ctk.CTkFrame):
         x = (modal.winfo_screenwidth() // 2) - (modal.winfo_width() // 2)
         y = (modal.winfo_screenheight() // 2) - (modal.winfo_height() // 2)
         modal.geometry(f"+{x}+{y}")
+        animate_toplevel_in(modal, x=x, y=y)
 
         frame = ctk.CTkFrame(modal, fg_color="transparent")
         frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -1049,6 +1060,7 @@ class CollegesView(ctk.CTkFrame):
         x = (edit_window.winfo_screenwidth() // 2) - (edit_window.winfo_width() // 2)
         y = (edit_window.winfo_screenheight() // 2) - (edit_window.winfo_height() // 2)
         edit_window.geometry(f"+{x}+{y}")
+        animate_toplevel_in(edit_window, x=x, y=y)
         
         container = ctk.CTkFrame(edit_window, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=16, pady=16)

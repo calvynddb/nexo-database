@@ -10,7 +10,7 @@ This will:
 2. Let you create a new admin with a simple password (admin123)
 """
 
-from backend import get_session, hash_password
+from backend import get_session, hash_password, validate_password
 from backend.models import User
 
 def main():
@@ -39,6 +39,12 @@ def main():
     
     # Create testadmin with password "password123"
     password = "password123"
+    ok, msg = validate_password(password)
+    if not ok:
+        print(f"❌ Password validation failed: {msg}")
+        session.close()
+        return
+
     salt, pw_hash = hash_password(password)
     
     new_admin = User(
