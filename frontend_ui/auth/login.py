@@ -10,6 +10,7 @@ from config import (
     ACCENT_COLOR,
     TEXT_MUTED,
     BORDER_COLOR,
+    SURFACE_SECTION,
     FONT_BOLD,
     get_font,
     TEXT_PRIMARY,
@@ -17,7 +18,18 @@ from config import (
     ENTRY_BG,
     BTN_PRIMARY_FG,
     BTN_PRIMARY_HOVER,
+    BTN_SEGMENT_FG,
+    BTN_SEGMENT_HOVER,
+    BORDER_WIDTH_THIN,
+    BORDER_WIDTH_STRONG,
+    SPACE_SM,
+    SPACE_MD,
+    SPACE_LG,
+    CONTROL_HEIGHT_MD,
     CONTROL_HEIGHT_LG,
+    RADIUS_SM,
+    RADIUS_MD,
+    RADIUS_XL,
 )
 from frontend_ui.ui import DepthCard, get_icon, get_main_logo
 
@@ -36,26 +48,37 @@ class LoginFrame(ctk.CTkFrame):
         center_frame.grid_columnconfigure(0, weight=1)
 
         # clean, flat card with depth effect - dark themed
-        card = DepthCard(center_frame, fg_color=PANEL_COLOR, corner_radius=20, border_width=2, border_color=BORDER_COLOR, width=520, height=620)
-        card.grid(row=0, column=0, padx=20, pady=20)
+        card = DepthCard(
+            center_frame,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_MD,
+            border_width=BORDER_WIDTH_STRONG,
+            border_color=BORDER_COLOR,
+            width=540,
+            height=640,
+        )
+        card.grid(row=0, column=0, padx=SPACE_LG, pady=SPACE_LG)
         card.grid_propagate(False)
         card.pack_propagate(False)
 
+        title_strip = ctk.CTkFrame(card, fg_color=ACCENT_COLOR, height=4, corner_radius=0)
+        title_strip.pack(fill="x", padx=0, pady=(0, SPACE_SM))
+
         # logo - extra large for prominent display
-        logo_frame = ctk.CTkFrame(card, fg_color="transparent")
-        logo_frame.pack(pady=(30, 25))
+        logo_frame = ctk.CTkFrame(card, fg_color=SURFACE_SECTION, corner_radius=RADIUS_SM, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
+        logo_frame.pack(pady=(SPACE_LG, SPACE_MD), padx=SPACE_LG)
         
         # load main logo - extra big
         try:
-            self._logo_img = get_main_logo(size=150)
+            self._logo_img = get_main_logo(size=138)
             lbl = ctk.CTkLabel(logo_frame, image=self._logo_img, text="")
             lbl.image = self._logo_img
-            lbl.pack()
+            lbl.pack(padx=SPACE_LG, pady=SPACE_MD)
         except Exception:
-            ctk.CTkLabel(logo_frame, text="nexo", font=get_font(32, True), text_color=TITLE_COLOR).pack()
+            ctk.CTkLabel(logo_frame, text="nexo", font=get_font(32, True), text_color=TITLE_COLOR).pack(padx=SPACE_LG, pady=SPACE_MD)
 
         ctk.CTkLabel(card, text="nexo", font=get_font(30, True), text_color=TITLE_COLOR).pack(pady=(0, 8))
-        ctk.CTkLabel(card, text="Administrative Access", font=get_font(12), text_color=TEXT_MUTED).pack(pady=(0, 28))
+        ctk.CTkLabel(card, text="Administrative Access", font=get_font(12), text_color=TEXT_MUTED).pack(pady=(0, SPACE_LG))
 
         self.username_entry = self.create_input(card, "Username", "👤  Enter your username")
         self.password_entry = self.create_input(card, "Password", "🔒  Enter your password", show="*")
@@ -63,7 +86,17 @@ class LoginFrame(ctk.CTkFrame):
         self.password_entry.bind("<Return>", lambda e: self.handle_login())
 
         # templated login function with enhanced button
-        ctk.CTkButton(card, text="Sign In", font=get_font(13, True), fg_color=BTN_PRIMARY_FG, text_color="white", hover_color=BTN_PRIMARY_HOVER, height=CONTROL_HEIGHT_LG, corner_radius=10,
+        ctk.CTkButton(
+            card,
+            text="Sign In",
+            font=get_font(13, True),
+            fg_color=BTN_PRIMARY_FG,
+            text_color="white",
+            hover_color=BTN_PRIMARY_HOVER,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
+            height=CONTROL_HEIGHT_LG,
+            corner_radius=0,
                       command=self.handle_login).pack(fill="x", padx=50, pady=(22, 40))
 
     def on_frame_shown(self):
@@ -74,9 +107,19 @@ class LoginFrame(ctk.CTkFrame):
 
 
     def create_input(self, parent, label, placeholder, show=""):
-        ctk.CTkLabel(parent, text=label, font=get_font(12, True), text_color=TEXT_PRIMARY).pack(anchor="w", padx=50, pady=(10, 4))
-        entry = ctk.CTkEntry(parent, placeholder_text=placeholder, height=CONTROL_HEIGHT_LG, border_color=BORDER_COLOR, fg_color=ENTRY_BG, text_color=TEXT_PRIMARY, show=show)
-        entry.pack(fill="x", padx=50, pady=(0, 12))
+        ctk.CTkLabel(parent, text=label.upper(), font=get_font(11, True), text_color=TEXT_MUTED).pack(anchor="w", padx=50, pady=(8, 4))
+        entry = ctk.CTkEntry(
+            parent,
+            placeholder_text=placeholder,
+            height=CONTROL_HEIGHT_LG,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
+            fg_color=ENTRY_BG,
+            text_color=TEXT_PRIMARY,
+            show=show,
+        )
+        entry.pack(fill="x", padx=50, pady=(0, 10))
         return entry
 
     def handle_login(self):
@@ -124,34 +167,35 @@ class LoginFrame(ctk.CTkFrame):
         reg_window.geometry(f"+{x}+{y}")
         
         container = ctk.CTkFrame(reg_window, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=16, pady=16)
+        container.pack(fill="both", expand=True, padx=SPACE_LG, pady=SPACE_LG)
         
-        form_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR)
+        form_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_STRONG, border_color=BORDER_COLOR)
         form_card.pack(fill="both", expand=True)
+        ctk.CTkFrame(form_card, fg_color=ACCENT_COLOR, height=3, corner_radius=0).pack(fill="x", pady=(0, SPACE_SM))
         frame = ctk.CTkScrollableFrame(form_card, fg_color="transparent")
-        frame.pack(fill="both", expand=True, padx=12, pady=12)
+        frame.pack(fill="both", expand=True, padx=SPACE_MD, pady=SPACE_SM)
         
         ctk.CTkLabel(frame, text="Register Administrator", 
                     font=get_font(16, True)).pack(anchor="w", pady=(0, 12))
         
         ctk.CTkLabel(frame, text="Full Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 4))
-        name_entry = ctk.CTkEntry(frame, placeholder_text="Enter full name", height=40)
+        name_entry = ctk.CTkEntry(frame, placeholder_text="Enter full name", height=CONTROL_HEIGHT_MD)
         name_entry.pack(fill="x", pady=(0, 12))
         
         ctk.CTkLabel(frame, text="Username", font=FONT_BOLD).pack(anchor="w", pady=(10, 4))
-        username_entry = ctk.CTkEntry(frame, placeholder_text="Choose username", height=40)
+        username_entry = ctk.CTkEntry(frame, placeholder_text="Choose username", height=CONTROL_HEIGHT_MD)
         username_entry.pack(fill="x", pady=(0, 12))
         
         ctk.CTkLabel(frame, text="Email", font=FONT_BOLD).pack(anchor="w", pady=(10, 4))
-        email_entry = ctk.CTkEntry(frame, placeholder_text="Enter email", height=40)
+        email_entry = ctk.CTkEntry(frame, placeholder_text="Enter email", height=CONTROL_HEIGHT_MD)
         email_entry.pack(fill="x", pady=(0, 12))
         
         ctk.CTkLabel(frame, text="Password", font=FONT_BOLD).pack(anchor="w", pady=(10, 4))
-        pass_entry = ctk.CTkEntry(frame, placeholder_text="Enter password", show="*", height=40)
+        pass_entry = ctk.CTkEntry(frame, placeholder_text="Enter password", show="*", height=CONTROL_HEIGHT_MD)
         pass_entry.pack(fill="x", pady=(0, 12))
         
         ctk.CTkLabel(frame, text="Confirm Password", font=FONT_BOLD).pack(anchor="w", pady=(10, 4))
-        confirm_entry = ctk.CTkEntry(frame, placeholder_text="Confirm password", show="*", height=40)
+        confirm_entry = ctk.CTkEntry(frame, placeholder_text="Confirm password", show="*", height=CONTROL_HEIGHT_MD)
         confirm_entry.pack(fill="x", pady=(0, 20))
         
         def register_user():
@@ -183,5 +227,16 @@ class LoginFrame(ctk.CTkFrame):
             self.controller.show_custom_dialog("Success", "Administrator registered successfully! Please log in.")
             reg_window.destroy()
         
-        ctk.CTkButton(frame, text="Register", command=register_user, height=40,
-                       fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER, text_color="white", font=FONT_BOLD).pack(fill="x")
+        ctk.CTkButton(
+            frame,
+            text="Register",
+            command=register_user,
+            height=CONTROL_HEIGHT_MD,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
+            text_color="white",
+            font=FONT_BOLD,
+        ).pack(fill="x")

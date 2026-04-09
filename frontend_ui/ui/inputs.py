@@ -5,7 +5,21 @@ Input and entry widgets for EduManage SIS.
 import customtkinter as ctk
 import tkinter as tk
 import time
-from config import PANEL_COLOR, ACCENT_COLOR, TEXT_PRIMARY, BORDER_COLOR, get_font
+from config import (
+    PANEL_COLOR,
+    ACCENT_COLOR,
+    TEXT_PRIMARY,
+    BORDER_COLOR,
+    ENTRY_BG,
+    SURFACE_HOVER,
+    BTN_SEGMENT_FG,
+    BTN_SEGMENT_HOVER,
+    BORDER_WIDTH_THIN,
+    CONTROL_HEIGHT_MD,
+    CONTROL_HEIGHT_SM,
+    RADIUS_SM,
+    get_font,
+)
 from .utils import log_ui_timing
 
 
@@ -27,15 +41,16 @@ class SearchableComboBox(ctk.CTkFrame):
         main_frame.grid_columnconfigure(1, weight=0)
         
         # text entry
-        self.entry = ctk.CTkEntry(main_frame, placeholder_text=kwargs.get("placeholder", "Select..."), 
-                                   height=kwargs.get("height", 40), fg_color="#2A1F3D",
-                                   border_width=1, border_color=BORDER_COLOR)
+        self.entry = ctk.CTkEntry(main_frame, placeholder_text=kwargs.get("placeholder", "Select..."),
+                       height=kwargs.get("height", CONTROL_HEIGHT_MD), fg_color=ENTRY_BG,
+                                   border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
         self.entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
         
         # dropdown button with arrow
-        self.dropdown_btn = ctk.CTkButton(main_frame, text="▼", width=40, height=kwargs.get("height", 40),
-                                         fg_color="#2A1F3D", text_color=TEXT_PRIMARY,
-                                         border_width=1, border_color=BORDER_COLOR,
+        self.dropdown_btn = ctk.CTkButton(main_frame, text="▼", width=40, height=kwargs.get("height", CONTROL_HEIGHT_MD),
+                         fg_color=BTN_SEGMENT_FG, text_color=TEXT_PRIMARY,
+                                         hover_color=BTN_SEGMENT_HOVER,
+                                         border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
                                          command=self._toggle_dropdown)
         self.dropdown_btn.grid(row=0, column=1, sticky="e")
         
@@ -105,7 +120,7 @@ class SearchableComboBox(ctk.CTkFrame):
             self.dropdown.configure(fg_color=PANEL_COLOR)
 
             self.list_frame = ctk.CTkFrame(self.dropdown, fg_color=PANEL_COLOR,
-                                          border_width=1, border_color=ACCENT_COLOR, corner_radius=6)
+                                          border_width=BORDER_WIDTH_THIN, border_color=ACCENT_COLOR, corner_radius=RADIUS_SM)
             self.list_frame.pack(fill="both", expand=True)
         else:
             try:
@@ -125,14 +140,15 @@ class SearchableComboBox(ctk.CTkFrame):
         width = self.entry.winfo_width() + self.dropdown_btn.winfo_width() + 4
         
         display_count = min(len(matches), 5)
-        self.dropdown.geometry(f"{width}x{display_count * 35 + 10}+{x}+{y}")
+        option_height = CONTROL_HEIGHT_SM + 2
+        self.dropdown.geometry(f"{width}x{display_count * option_height + 8}+{x}+{y}")
         self.dropdown.lift()
         
         # add option buttons
         for opt in matches:
             btn = ctk.CTkButton(self.list_frame, text=opt, anchor="w",
                                fg_color="transparent", text_color=TEXT_PRIMARY,
-                               hover_color="#2A1F3D", height=30, corner_radius=0,
+                               hover_color=SURFACE_HOVER, height=CONTROL_HEIGHT_SM, corner_radius=0,
                                font=get_font(13), command=lambda o=opt: self._select_option(o))
             btn.pack(fill="x", padx=1, pady=1)
 
@@ -200,15 +216,16 @@ class StyledComboBox(ctk.CTkFrame):
         main_frame.grid_columnconfigure(1, weight=0)
         
         # display label
-        self.entry = ctk.CTkEntry(main_frame, placeholder_text=kwargs.get("placeholder", "Select..."), 
-                                   height=kwargs.get("height", 40), fg_color="#2A1F3D",
-                                   border_width=1, border_color=BORDER_COLOR)
+        self.entry = ctk.CTkEntry(main_frame, placeholder_text=kwargs.get("placeholder", "Select..."),
+                       height=kwargs.get("height", CONTROL_HEIGHT_MD), fg_color=ENTRY_BG,
+                                   border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
         self.entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
         
         # dropdown button with arrow
-        self.dropdown_btn = ctk.CTkButton(main_frame, text="▼", width=40, height=kwargs.get("height", 40),
-                                         fg_color="#2A1F3D", text_color=TEXT_PRIMARY,
-                                         border_width=1, border_color=BORDER_COLOR,
+        self.dropdown_btn = ctk.CTkButton(main_frame, text="▼", width=40, height=kwargs.get("height", CONTROL_HEIGHT_MD),
+                         fg_color=BTN_SEGMENT_FG, text_color=TEXT_PRIMARY,
+                                         hover_color=BTN_SEGMENT_HOVER,
+                                         border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
                                          command=self._show_menu)
         self.dropdown_btn.grid(row=0, column=1, sticky="e")
         
@@ -238,7 +255,7 @@ class StyledComboBox(ctk.CTkFrame):
             self.dropdown.configure(fg_color=PANEL_COLOR)
 
             self.list_frame = ctk.CTkFrame(self.dropdown, fg_color=PANEL_COLOR,
-                                           border_width=1, border_color=ACCENT_COLOR, corner_radius=6)
+                                           border_width=BORDER_WIDTH_THIN, border_color=ACCENT_COLOR, corner_radius=RADIUS_SM)
             self.list_frame.pack(fill="both", expand=True)
         else:
             try:
@@ -257,14 +274,15 @@ class StyledComboBox(ctk.CTkFrame):
         width = self.entry.winfo_width() + self.dropdown_btn.winfo_width() + 4
         
         display_count = min(len(self.values), 5)
-        self.dropdown.geometry(f"{width}x{display_count * 35 + 10}+{x}+{y}")
+        option_height = CONTROL_HEIGHT_SM + 2
+        self.dropdown.geometry(f"{width}x{display_count * option_height + 8}+{x}+{y}")
         self.dropdown.lift()
         
         # add option buttons
         for val in self.values:
             btn = ctk.CTkButton(self.list_frame, text=val, anchor="w",
                                fg_color="transparent", text_color=TEXT_PRIMARY,
-                               hover_color="#2A1F3D", height=30, corner_radius=0,
+                               hover_color=SURFACE_HOVER, height=CONTROL_HEIGHT_SM, corner_radius=0,
                                font=get_font(13), command=lambda v=val: self._select_option(v))
             btn.pack(fill="x", padx=1, pady=1)
 
@@ -358,8 +376,8 @@ class SmartSearchEntry(ctk.CTkEntry):
             self.dropdown.attributes("-topmost", True)
             self.dropdown.configure(fg_color=PANEL_COLOR)
 
-            self.list_frame = ctk.CTkFrame(self.dropdown, fg_color=PANEL_COLOR, 
-                                            border_width=1, border_color=ACCENT_COLOR, corner_radius=8)
+            self.list_frame = ctk.CTkFrame(self.dropdown, fg_color=PANEL_COLOR,
+                                            border_width=BORDER_WIDTH_THIN, border_color=ACCENT_COLOR, corner_radius=RADIUS_SM)
             self.list_frame.pack(fill="both", expand=True)
         else:
             try:
@@ -377,13 +395,14 @@ class SmartSearchEntry(ctk.CTkEntry):
         width = self.winfo_width()
         
         display_count = min(len(matches), 5)
-        self.dropdown.geometry(f"{width}x{display_count * 35 + 10}+{x}+{y}")
+        option_height = CONTROL_HEIGHT_SM + 2
+        self.dropdown.geometry(f"{width}x{display_count * option_height + 8}+{x}+{y}")
         self.dropdown.lift()
 
         for opt in matches:
-            btn = ctk.CTkButton(self.list_frame, text=opt, anchor="w", 
-                                fg_color="transparent", text_color="#d1d1d1",
-                                hover_color="#2A1F3D", height=30, corner_radius=0,
+            btn = ctk.CTkButton(self.list_frame, text=opt, anchor="w",
+                                fg_color="transparent", text_color=TEXT_PRIMARY,
+                                hover_color=SURFACE_HOVER, height=CONTROL_HEIGHT_SM, corner_radius=0,
                                 command=lambda o=opt: self._select_option(o))
             btn.pack(fill="x", padx=5, pady=1)
 

@@ -8,15 +8,24 @@ import os
 import time
 from pathlib import Path
 from config import (
+    ACCENT_COLOR,
     PANEL_COLOR,
+    TEXT_PRIMARY,
     TEXT_MUTED,
     BORDER_COLOR,
+    SURFACE_SECTION,
+    BTN_PRIMARY_HOVER,
+    BTN_NEUTRAL_FG,
+    BTN_NEUTRAL_HOVER,
+    CONTROL_HEIGHT_MD,
     PANEL_SELECTED,
     TABLE_HEADER_BG,
     TABLE_HEADER_HOVER,
     TABLE_HEADER_FG,
     ANIMATIONS_ENABLED,
     REDUCED_MOTION,
+    RADIUS_SM,
+    RADIUS_MD,
     get_font,
     get_motion_duration,
     resource_path,
@@ -55,16 +64,16 @@ class SoftLoadingOverlay:
         self._base_text = "Loading"
         self._pulse_interval_ms = 220 if not REDUCED_MOTION else 320
 
-        self._overlay = ctk.CTkFrame(parent, fg_color="#120f18", corner_radius=0)
+        self._overlay = ctk.CTkFrame(parent, fg_color="#08060d", corner_radius=0)
         self._overlay.grid_rowconfigure(0, weight=1)
         self._overlay.grid_columnconfigure(0, weight=1)
 
         panel = ctk.CTkFrame(
             self._overlay,
-            fg_color="#1d1727",
-            corner_radius=12,
-            border_width=1,
-            border_color="#2a1f35",
+            fg_color=SURFACE_SECTION,
+            corner_radius=RADIUS_MD,
+            border_width=2,
+            border_color=BORDER_COLOR,
         )
         panel.grid(row=0, column=0, padx=20, pady=20, sticky="")
 
@@ -72,11 +81,11 @@ class SoftLoadingOverlay:
             panel,
             text="Loading",
             font=get_font(13, True),
-            text_color="#d8d5de",
+            text_color=TEXT_PRIMARY,
         )
         self._label.pack(padx=18, pady=(14, 8))
 
-        self._bar = ctk.CTkProgressBar(panel, mode="indeterminate", width=180, progress_color="#6d5a8a")
+        self._bar = ctk.CTkProgressBar(panel, mode="indeterminate", width=180, progress_color=ACCENT_COLOR)
         self._bar.pack(padx=18, pady=(0, 14))
 
     def show(self, message: str = "Loading"):
@@ -255,7 +264,7 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
 
     # type badge
     badge = ctk.CTkLabel(frame, text=icon_text, font=get_font(11, True),
-                         text_color="white", fg_color=accent, corner_radius=6,
+                         text_color="white", fg_color=accent, corner_radius=RADIUS_SM,
                          width=70, height=22)
     badge.pack(pady=(0, 10))
 
@@ -278,14 +287,14 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
             _close_dialog(False)
 
         ctk.CTkButton(button_frame, text="Yes", fg_color=accent, text_color="white",
-                      hover_color="#7C3AED", font=get_font(13, True), height=36,
+                      hover_color=BTN_PRIMARY_HOVER, font=get_font(13, True), height=CONTROL_HEIGHT_MD,
                       command=_yes).pack(side="left", fill="x", expand=True, padx=(0, 8))
-        ctk.CTkButton(button_frame, text="No", fg_color="#3a3a3f", text_color="white",
-                      hover_color="#4a4a4f", font=get_font(13, True), height=36,
+        ctk.CTkButton(button_frame, text="No", fg_color=BTN_NEUTRAL_FG, text_color="white",
+                      hover_color=BTN_NEUTRAL_HOVER, font=get_font(13, True), height=CONTROL_HEIGHT_MD,
                       command=_no).pack(side="left", fill="x", expand=True, padx=(8, 0))
     else:
         ctk.CTkButton(button_frame, text="OK", fg_color=accent, text_color="white",
-                      hover_color="#7C3AED", font=get_font(13, True), height=36,
+                      hover_color=BTN_PRIMARY_HOVER, font=get_font(13, True), height=CONTROL_HEIGHT_MD,
                       command=_close_dialog).pack(fill="x")
 
     dialog_window.protocol(
@@ -380,8 +389,8 @@ def setup_treeview_style():
     style.configure(
         "Treeview", 
         background=PANEL_COLOR,
-        foreground="#e2e8f0",
-        rowheight=48,
+        foreground=TEXT_PRIMARY,
+        rowheight=46,
         fieldbackground=PANEL_COLOR,
         borderwidth=0,
         highlightthickness=0,
@@ -395,14 +404,14 @@ def setup_treeview_style():
         "Treeview.Heading",
         background=TABLE_HEADER_BG,
         foreground=TABLE_HEADER_FG,
-        relief="flat",
+                relief="solid",
         borderwidth=0,
-        padding=(8, 12),
+                padding=(10, 10),
         font=get_font(13, True)
     )
     style.map("Treeview.Heading", 
               background=[('active', TABLE_HEADER_HOVER)],
-              foreground=[('active', '#e2e8f0')])
+              foreground=[('active', TEXT_PRIMARY)])
 
     # remove focus ring highlight
     try:

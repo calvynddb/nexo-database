@@ -10,7 +10,13 @@ from config import (
     FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR,
     TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY,
     BTN_PRIMARY_FG, BTN_PRIMARY_HOVER, DANGER_COLOR, DANGER_HOVER,
-    ENTRY_BG, TABLE_ODD_BG, TABLE_EVEN_BG, TABLE_HOVER_BG
+    BTN_SEGMENT_FG, BTN_SEGMENT_HOVER,
+    ENTRY_BG, TABLE_ODD_BG, TABLE_EVEN_BG, TABLE_HOVER_BG,
+    SURFACE_SECTION,
+    CONTROL_HEIGHT_SM, CONTROL_HEIGHT_MD,
+    RADIUS_SM, RADIUS_MD, RADIUS_LG,
+    BORDER_WIDTH_THIN, BORDER_WIDTH_STRONG,
+    SPACE_XS, SPACE_SM, SPACE_MD, SPACE_LG,
 )
 from config import get_font
 from frontend_ui.ui import DepthCard, placeholder_image, setup_treeview_style, get_icon, animate_toplevel_in, log_ui_timing
@@ -34,7 +40,13 @@ class CollegesView(ctk.CTkFrame):
         self.setup_ui()
 
     def setup_ui(self):
-        table_container = DepthCard(self, fg_color=PANEL_COLOR, corner_radius=15, border_width=2, border_color=BORDER_COLOR)
+        table_container = DepthCard(
+            self,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_LG,
+            border_width=BORDER_WIDTH_STRONG,
+            border_color=BORDER_COLOR,
+        )
         table_container.grid(row=1, column=0, sticky="nsew", padx=(0, 25))
         
         setup_treeview_style()
@@ -55,7 +67,7 @@ class CollegesView(ctk.CTkFrame):
             self.column_names[c] = c.upper()
             self.tree.heading(c, text=c.upper() + " ⇅")
             self.tree.column(c, anchor="center", stretch=False, width=120)
-        self.tree.pack(fill="both", expand=True, padx=15, pady=(15, 12))
+        self.tree.pack(fill="both", expand=True, padx=SPACE_LG, pady=(SPACE_LG, SPACE_MD))
         self.tree.bind("<Button-1>", self.on_column_click)
         self.tree.bind("<Motion>", self._on_tree_motion)
         self.tree.bind("<Leave>", self._on_tree_leave)
@@ -68,7 +80,7 @@ class CollegesView(ctk.CTkFrame):
 
         # pagination controls - integrated layout
         ctrl = ctk.CTkFrame(table_container, fg_color="transparent")
-        ctrl.pack(fill="x", padx=15, pady=(10,12))
+        ctrl.pack(fill="x", padx=SPACE_LG, pady=(SPACE_SM, SPACE_MD))
         self.table_container = table_container
         self._last_hover = None
         
@@ -76,7 +88,7 @@ class CollegesView(ctk.CTkFrame):
         left_ctrl = ctk.CTkFrame(ctrl, fg_color="transparent")
         left_ctrl.pack(side="left")
         
-        self.prev_btn = ctk.CTkButton(left_ctrl, text="◀ Prev", width=80, fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER, text_color="white", command=lambda: self.change_page(-1))
+        self.prev_btn = ctk.CTkButton(left_ctrl, text="◀ Prev", width=92, height=CONTROL_HEIGHT_SM, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER, text_color="white", command=lambda: self.change_page(-1))
         self.prev_btn.pack(side="left", padx=(0,8))
         
         self.pagination_frame = ctk.CTkFrame(left_ctrl, fg_color="transparent")
@@ -84,7 +96,7 @@ class CollegesView(ctk.CTkFrame):
         self.page_buttons = []
         
         # next Button - right next to pagination
-        self.next_btn = ctk.CTkButton(left_ctrl, text="Next ▶", width=80, fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER, text_color="white", command=lambda: self.change_page(1))
+        self.next_btn = ctk.CTkButton(left_ctrl, text="Next ▶", width=92, height=CONTROL_HEIGHT_SM, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER, text_color="white", command=lambda: self.change_page(1))
         self.next_btn.pack(side="left", padx=(8,0))
         
         # go to page section
@@ -93,14 +105,15 @@ class CollegesView(ctk.CTkFrame):
         
         ctk.CTkLabel(goto_frame, text="Go to:", font=get_font(12), text_color=TEXT_MUTED).pack(side="left", padx=(0, 5))
         
-        self.page_entry = ctk.CTkEntry(goto_frame, width=50, height=30, 
+        self.page_entry = ctk.CTkEntry(goto_frame, width=50, height=CONTROL_HEIGHT_SM,
                                        fg_color=ENTRY_BG, border_color=BORDER_COLOR,
                                        text_color=TEXT_PRIMARY, font=get_font(12))
         self.page_entry.pack(side="left", padx=(0, 5))
         self.page_entry.bind("<Return>", lambda e: self.go_to_page())
         
-        self.go_btn = ctk.CTkButton(goto_frame, text="Go", width=40, height=30,
-                                    fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER,
+        self.go_btn = ctk.CTkButton(goto_frame, text="Go", width=44, height=CONTROL_HEIGHT_SM,
+                        fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER,
+                        corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
                                     text_color="white", font=get_font(12, True),
                                     command=self.go_to_page)
         self.go_btn.pack(side="left")
@@ -113,9 +126,12 @@ class CollegesView(ctk.CTkFrame):
             right_ctrl,
             text="Edit Selected",
             width=120,
-            height=30,
-            fg_color=BTN_PRIMARY_FG,
-            hover_color=BTN_PRIMARY_HOVER,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
             text_color="white",
             font=get_font(12, True),
             command=self.edit_selected_colleges,
@@ -125,7 +141,10 @@ class CollegesView(ctk.CTkFrame):
             right_ctrl,
             text="Delete Selected",
             width=130,
-            height=30,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
             fg_color=DANGER_COLOR,
             hover_color=DANGER_HOVER,
             text_color="white",
@@ -139,15 +158,15 @@ class CollegesView(ctk.CTkFrame):
 
         # table_container configure binding will be set below after cards are created
 
-        right_panel = ctk.CTkFrame(self, width=280, fg_color="transparent")
+        right_panel = ctk.CTkFrame(self, width=320, fg_color="transparent")
         right_panel.grid(row=1, column=1, sticky="nsew")
         
-        ctk.CTkLabel(right_panel, text="DIRECTORY FACTS", font=get_font(13, True), text_color=TEXT_MUTED).pack(anchor="w", pady=(0, 10))
+        ctk.CTkLabel(right_panel, text="DIRECTORY FACTS", font=get_font(12, True), text_color=TEXT_MUTED).pack(anchor="w", pady=(0, SPACE_SM))
 
         # use icons like Students view and keep references to avoid GC
         self._fact_img_students = get_icon("users", size=28, fallback_color=ACCENT_COLOR)
         self._fact_img_programs = get_icon("books", size=28, fallback_color="#8b5cf6")
-        self._fact_img_colleges = get_icon("building", size=28, fallback_color="#4f6bed")
+        self._fact_img_colleges = get_icon("building", size=28, fallback_color="#7c5fb2")
 
         total_students = str(len(self.controller.students))
         total_programs = str(len(self.controller.programs))
@@ -187,7 +206,7 @@ class CollegesView(ctk.CTkFrame):
         self.refresh_table()
 
     def fact_card(self, parent, title, val, icon_img, color, height=80, expand=False):
-        card = DepthCard(parent, fg_color=color, corner_radius=10, border_width=2, border_color=BORDER_COLOR, height=height)
+        card = DepthCard(parent, fg_color=color, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_STRONG, border_color=BORDER_COLOR, height=height)
         if expand:
             card.pack(fill="both", expand=True, pady=8)
         else:
@@ -254,8 +273,12 @@ class CollegesView(ctk.CTkFrame):
                 self.pagination_frame,
                 text="",
                 width=32,
-                height=28,
-                fg_color="#3b3b3f",
+                height=CONTROL_HEIGHT_SM,
+                corner_radius=0,
+                border_width=BORDER_WIDTH_THIN,
+                border_color=BORDER_COLOR,
+                fg_color=BTN_SEGMENT_FG,
+                hover_color=BTN_SEGMENT_HOVER,
                 command=lambda: None,
             )
             btn.pack(side="left", padx=2)
@@ -266,7 +289,7 @@ class CollegesView(ctk.CTkFrame):
             is_current = page_num == self.current_page
             btn.configure(
                 text=str(page_num),
-                fg_color=ACCENT_COLOR if is_current else "#3b3b3f",
+                fg_color=ACCENT_COLOR if is_current else BTN_SEGMENT_FG,
                 command=lambda page=page_num: self.goto_page(page),
             )
             if not btn.winfo_manager():
@@ -311,7 +334,7 @@ class CollegesView(ctk.CTkFrame):
         # account for: Treeview header (~20px) + padding (~12px) + pagination controls (~55px)
         reserved_height = 20 + 12 + 55
         usable_height = max(available_height - reserved_height, 50)
-        row_height = 48  # height of each row
+        row_height = 46  # height of each row
         new_page_size = max(8, usable_height // row_height)  # show at least 8 rows
         
         # update treeview height to match page size
@@ -347,11 +370,11 @@ class CollegesView(ctk.CTkFrame):
         for w in self.right_panel.winfo_children():
             w.destroy()
 
-        ctk.CTkLabel(self.right_panel, text="DIRECTORY FACTS", font=get_font(13, True), text_color=TEXT_MUTED).pack(anchor="w", pady=(0, 10))
+        ctk.CTkLabel(self.right_panel, text="DIRECTORY FACTS", font=get_font(12, True), text_color=TEXT_MUTED).pack(anchor="w", pady=(0, SPACE_SM))
 
         self._fact_img_students = get_icon("users", size=28, fallback_color=ACCENT_COLOR)
         self._fact_img_programs = get_icon("books", size=28, fallback_color="#8b5cf6")
-        self._fact_img_colleges = get_icon("building", size=28, fallback_color="#4f6bed")
+        self._fact_img_colleges = get_icon("building", size=28, fallback_color="#7c5fb2")
 
         total_students = str(len(self.controller.students))
         total_programs = str(len(self.controller.programs))
@@ -469,7 +492,7 @@ class CollegesView(ctk.CTkFrame):
         container.pack(fill="both", expand=True, padx=16, pady=16)
         
         # card showing college info
-        info_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR)
+        info_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
         info_card.pack(fill="x", pady=(0, 12))
         info_frame = ctk.CTkFrame(info_card, fg_color="transparent")
         info_frame.pack(fill="x", padx=12, pady=12)
@@ -517,13 +540,13 @@ class CollegesView(ctk.CTkFrame):
         container.pack(fill="both", expand=True, padx=20, pady=20)
 
         # header with code and name
-        header = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR)
+        header = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_STRONG, border_color=BORDER_COLOR)
         header.pack(fill="x", pady=(0, 15))
 
         header_inner = ctk.CTkFrame(header, fg_color="transparent")
         header_inner.pack(fill="x", padx=20, pady=16)
 
-        avatar = ctk.CTkFrame(header_inner, width=72, height=72, fg_color="#2d1f45", corner_radius=10)
+        avatar = ctk.CTkFrame(header_inner, width=72, height=72, fg_color=SURFACE_SECTION, corner_radius=RADIUS_SM)
         avatar.pack(side="left", padx=(0, 16))
         avatar.pack_propagate(False)
         ctk.CTkLabel(avatar, text="\U0001f3eb", font=get_font(32)).pack(expand=True)
@@ -538,7 +561,7 @@ class CollegesView(ctk.CTkFrame):
         btn_frame.pack(side="bottom", fill="x", pady=(15, 0))
 
         # info card with scrollable content
-        info_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR)
+        info_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
         info_card.pack(fill="both", expand=True)
 
         info_scroll = ctk.CTkScrollableFrame(info_card, fg_color="transparent")
@@ -594,8 +617,8 @@ class CollegesView(ctk.CTkFrame):
 
         # only show edit/delete buttons if user is logged in
         if self.controller.logged_in:
-            ctk.CTkButton(btn_frame, text="Edit", command=_edit, fg_color=ACCENT_COLOR, text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(0, 5))
-            ctk.CTkButton(btn_frame, text="Delete", command=_delete, fg_color=DANGER_COLOR, text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(5, 0))
+            ctk.CTkButton(btn_frame, text="Edit", command=_edit, fg_color=ACCENT_COLOR, text_color="white", font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(0, 5))
+            ctk.CTkButton(btn_frame, text="Delete", command=_delete, fg_color=DANGER_COLOR, text_color="white", font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(5, 0))
         else:
             # show message prompting login
             login_msg = ctk.CTkLabel(btn_frame, text="🔒 Log in to edit or delete", font=get_font(13), text_color=TEXT_MUTED)
@@ -733,11 +756,11 @@ class CollegesView(ctk.CTkFrame):
         ctk.CTkLabel(form_frame, text="New College", font=get_font(16, True)).pack(pady=(0, 20))
         
         ctk.CTkLabel(form_frame, text="College Code", font=FONT_BOLD).pack(anchor="w")
-        code_entry = ctk.CTkEntry(form_frame, placeholder_text="e.g., COE", height=40)
+        code_entry = ctk.CTkEntry(form_frame, placeholder_text="e.g., COE", height=CONTROL_HEIGHT_MD)
         code_entry.pack(fill="x", pady=(0, 15))
         
         ctk.CTkLabel(form_frame, text="College Name", font=FONT_BOLD).pack(anchor="w")
-        name_entry = ctk.CTkEntry(form_frame, placeholder_text="College Name", height=40)
+        name_entry = ctk.CTkEntry(form_frame, placeholder_text="College Name", height=CONTROL_HEIGHT_MD)
         name_entry.pack(fill="x", pady=(0, 20))
         
         def validate_form():
@@ -792,8 +815,8 @@ class CollegesView(ctk.CTkFrame):
             modal.destroy()
             self.controller.show_custom_dialog("Success", "College added successfully!")
         
-        ctk.CTkButton(form_frame, text="Save College", command=save, height=40,
-                     fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(fill="x")
+        ctk.CTkButton(form_frame, text="Save College", command=save, height=CONTROL_HEIGHT_MD,
+                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR).pack(fill="x")
 
         animate_toplevel_in(modal, x=x, y=y)
 
@@ -961,11 +984,11 @@ class CollegesView(ctk.CTkFrame):
         ctk.CTkLabel(frame, text=f"Bulk Edit {len(college_codes)} College(s)", font=get_font(16, True)).pack(anchor="w", pady=(0, 12))
 
         ctk.CTkLabel(frame, text="Name Prefix", font=FONT_BOLD).pack(anchor="w")
-        prefix_entry = ctk.CTkEntry(frame, placeholder_text="Optional prefix", height=38)
+        prefix_entry = ctk.CTkEntry(frame, placeholder_text="Optional prefix", height=CONTROL_HEIGHT_MD)
         prefix_entry.pack(fill="x", pady=(0, 10))
 
         ctk.CTkLabel(frame, text="Name Suffix", font=FONT_BOLD).pack(anchor="w")
-        suffix_entry = ctk.CTkEntry(frame, placeholder_text="Optional suffix", height=38)
+        suffix_entry = ctk.CTkEntry(frame, placeholder_text="Optional suffix", height=CONTROL_HEIGHT_MD)
         suffix_entry.pack(fill="x", pady=(0, 16))
 
         def save_bulk():
@@ -1025,8 +1048,8 @@ class CollegesView(ctk.CTkFrame):
 
         btn_row = ctk.CTkFrame(frame, fg_color="transparent")
         btn_row.pack(fill="x", pady=(6, 0))
-        ctk.CTkButton(btn_row, text="Apply Changes", command=save_bulk, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, fg_color="#555555", text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(6, 0))
+        ctk.CTkButton(btn_row, text="Apply Changes", command=save_bulk, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER, text_color="white", font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(6, 0))
 
         animate_toplevel_in(modal, x=x, y=y)
 
@@ -1085,26 +1108,26 @@ class CollegesView(ctk.CTkFrame):
         container.pack(fill="both", expand=True, padx=16, pady=16)
         
         # header card
-        header = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR, height=80)
+        header = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=80)
         header.pack(fill="x", pady=(0, 12))
         header.pack_propagate(False)
         ctk.CTkLabel(header, text=f"{college_code}", font=get_font(16, True)).place(x=16, y=14)
         ctk.CTkLabel(header, text="College", font=get_font(13), text_color=TEXT_MUTED).place(x=16, y=44)
         
         # form card
-        form_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR)
+        form_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
         form_card.pack(fill="both", expand=True)
         form_frame = ctk.CTkFrame(form_card, fg_color="transparent")
         form_frame.pack(fill="both", expand=True, padx=12, pady=12)
         
         ctk.CTkLabel(form_frame, text="College Code", font=FONT_BOLD).pack(anchor="w")
-        code_entry = ctk.CTkEntry(form_frame, height=40)
+        code_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
         code_entry.insert(0, college['code'])
         code_entry.configure(state="disabled")
         code_entry.pack(fill="x", pady=(0, 15))
         
         ctk.CTkLabel(form_frame, text="College Name", font=FONT_BOLD).pack(anchor="w")
-        name_entry = ctk.CTkEntry(form_frame, height=40)
+        name_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
         name_entry.insert(0, college['name'])
         name_entry.pack(fill="x", pady=(0, 20))
         
@@ -1151,10 +1174,11 @@ class CollegesView(ctk.CTkFrame):
                 else:
                     self.controller.show_custom_dialog("Error", msg, dialog_type="error")
         
-        ctk.CTkButton(button_frame, text="Save Changes", command=save, height=40,
-                     fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ctk.CTkButton(button_frame, text="Delete", command=delete, height=40,
-                     fg_color=DANGER_COLOR, hover_color=DANGER_HOVER, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
+        ctk.CTkButton(button_frame, text="Save Changes", command=save, height=CONTROL_HEIGHT_MD,
+                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR).pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ctk.CTkButton(button_frame, text="Delete", command=delete, height=CONTROL_HEIGHT_MD,
+                 fg_color=DANGER_COLOR, hover_color=DANGER_HOVER, font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR).pack(side="left", fill="x", expand=True, padx=(5, 0))
 
         animate_toplevel_in(edit_window, x=x, y=y)
+
 

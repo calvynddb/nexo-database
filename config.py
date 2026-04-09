@@ -34,8 +34,8 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")  # using dark-blue theme, but will override blue colors in code
 
 # --- fonts ---
-# Modern system-friendly typography for a cleaner UI hierarchy.
-FONT_FAMILY = "Segoe UI"
+# Geometric typeface to support the bold/brutalist UI direction.
+FONT_FAMILY = "Bahnschrift"
 FONT_MAIN = (FONT_FAMILY, 14)
 FONT_BOLD = (FONT_FAMILY, 14, "bold")
 
@@ -43,28 +43,31 @@ def get_font(size: int = 14, bold: bool = False):
     """Return a font tuple for widgets: (family, size[, 'bold'])."""
     return (FONT_FAMILY, size, "bold") if bold else (FONT_FAMILY, size)
 
-# --- colors --- bold-product dark aesthetic
-BG_COLOR = "#0b1220"
-PANEL_COLOR = "#111a2b"
-ACCENT_COLOR = "#2563eb"
-TEXT_MUTED = "#94a3b8"
-TEXT_PRIMARY = "#e2e8f0"
-BORDER_COLOR = "#253452"
-PANEL_SELECTED = "#22385f"
+# --- colors --- geometric brutalist purple aesthetic
+BG_COLOR = "#09070d"
+PANEL_COLOR = "#14101c"
+ACCENT_COLOR = "#a57bff"
+TEXT_MUTED = "#b6a7d8"
+TEXT_PRIMARY = "#f5f0ff"
+BORDER_COLOR = "#5b4a80"
+PANEL_SELECTED = "#3f2d66"
 
 # semantic surfaces and control colors
-TITLE_COLOR = "#dbeafe"
-SURFACE_SOFT = "#172338"
-SURFACE_INPUT = "#0f1b30"
-SURFACE_HOVER = "#1f3050"
+TITLE_COLOR = "#efe3ff"
+SURFACE_SOFT = "#211733"
+SURFACE_INPUT = "#100b18"
+SURFACE_HOVER = "#2b1f41"
+SURFACE_SECTION = "#1a1328"
 
 BTN_PRIMARY_FG = ACCENT_COLOR
-BTN_PRIMARY_HOVER = "#1d4ed8"
-BTN_SECONDARY_FG = "#243652"
-BTN_SECONDARY_HOVER = "#30466a"
-BTN_NEUTRAL_FG = "#1a2740"
-BTN_NEUTRAL_HOVER = "#263a5f"
-BTN_DISABLED_FG = "#334155"
+BTN_PRIMARY_HOVER = "#9164f5"
+BTN_SECONDARY_FG = "#1d1430"
+BTN_SECONDARY_HOVER = "#2a1e43"
+BTN_NEUTRAL_FG = "#191223"
+BTN_NEUTRAL_HOVER = "#281d3b"
+BTN_DISABLED_FG = "#3f3554"
+BTN_SEGMENT_FG = "#2c2538"
+BTN_SEGMENT_HOVER = "#3a3149"
 
 SUCCESS_COLOR = "#15803d"
 SUCCESS_HOVER = "#166534"
@@ -74,32 +77,35 @@ DANGER_HOVER = "#a31a31"
 ENTRY_BG = SURFACE_INPUT
 ENTRY_TEXT = TEXT_PRIMARY
 
-TABLE_ODD_BG = "#111d31"
-TABLE_EVEN_BG = "#0d1728"
-TABLE_HOVER_BG = "#27426b"
-TABLE_HEADER_BG = "#0f1b2f"
-TABLE_HEADER_HOVER = "#1d2f4c"
-TABLE_HEADER_FG = "#b8c7de"
+TABLE_ODD_BG = "#1a1327"
+TABLE_EVEN_BG = "#150f21"
+TABLE_HOVER_BG = "#32234d"
+TABLE_HEADER_BG = "#201733"
+TABLE_HEADER_HOVER = "#2f2348"
+TABLE_HEADER_FG = "#e0d4f8"
 
 # common sizing and spacing tokens
-SPACE_XS = 4
-SPACE_SM = 8
-SPACE_MD = 12
-SPACE_LG = 16
-SPACE_XL = 20
+SPACE_XS = 6
+SPACE_SM = 10
+SPACE_MD = 14
+SPACE_LG = 20
+SPACE_XL = 28
 
-RADIUS_SM = 8
-RADIUS_MD = 12
-RADIUS_LG = 15
-RADIUS_XL = 20
+RADIUS_SM = 2
+RADIUS_MD = 4
+RADIUS_LG = 6
+RADIUS_XL = 8
+
+BORDER_WIDTH_THIN = 2
+BORDER_WIDTH_STRONG = 3
 
 CONTROL_HEIGHT_SM = 30
-CONTROL_HEIGHT_MD = 40
-CONTROL_HEIGHT_LG = 48
+CONTROL_HEIGHT_MD = 38
+CONTROL_HEIGHT_LG = 46
 
 # --- window dimensions ---
-WINDOW_WIDTH = 1400
-WINDOW_HEIGHT = 940
+WINDOW_WIDTH = 1600
+WINDOW_HEIGHT = 1200
 
 # --- motion / animation settings ---
 # Keep motion subtle by default for smoother perceived performance.
@@ -135,16 +141,16 @@ def get_motion_duration(name: str, fallback: int = 140) -> int:
 
     return max(0, duration)
 
-# --- chart colors --- cool, high-contrast palette
+# --- chart colors --- purple-forward high-contrast palette
 COLOR_PALETTE = [
-    '#2563eb',
-    '#0ea5e9',
-    '#14b8a6',
-    '#4f46e5',
-    '#6366f1',
-    '#0284c7',
-    '#06b6d4',
-    '#0d9488'
+    '#a57bff',
+    '#bf9bff',
+    '#8f5bf0',
+    '#7b48dd',
+    '#d0b3ff',
+    '#6f42cc',
+    '#b587ff',
+    '#8d70bd'
 ]
 
 # --- Global Theme Manager ---

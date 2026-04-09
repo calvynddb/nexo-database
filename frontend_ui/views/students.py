@@ -10,7 +10,13 @@ from config import (
     FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR,
     TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY,
     BTN_PRIMARY_FG, BTN_PRIMARY_HOVER, DANGER_COLOR, DANGER_HOVER,
-    ENTRY_BG, TABLE_ODD_BG, TABLE_EVEN_BG, TABLE_HOVER_BG
+    BTN_SEGMENT_FG, BTN_SEGMENT_HOVER,
+    ENTRY_BG, TABLE_ODD_BG, TABLE_EVEN_BG, TABLE_HOVER_BG,
+    SURFACE_SECTION,
+    CONTROL_HEIGHT_SM, CONTROL_HEIGHT_MD,
+    RADIUS_SM, RADIUS_MD, RADIUS_LG,
+    BORDER_WIDTH_THIN, BORDER_WIDTH_STRONG,
+    SPACE_SM, SPACE_MD, SPACE_LG,
 )
 from config import get_font
 from frontend_ui.ui import (
@@ -40,7 +46,13 @@ class StudentsView(ctk.CTkFrame):
 
     def setup_ui(self):
         # table Container
-        table_container = DepthCard(self, fg_color=PANEL_COLOR, corner_radius=15, border_width=2, border_color=BORDER_COLOR)
+        table_container = DepthCard(
+            self,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_LG,
+            border_width=BORDER_WIDTH_STRONG,
+            border_color=BORDER_COLOR,
+        )
         table_container.grid(row=1, column=0, sticky="nsew", columnspan=2)
         
         setup_treeview_style()
@@ -71,11 +83,11 @@ class StudentsView(ctk.CTkFrame):
         self.tree.column("Program", width=120, anchor="center", stretch=False)
         self.tree.column("College", width=120, anchor="center", stretch=False)
         
-        self.tree.pack(fill="both", expand=True, padx=15, pady=(15, 12))
+        self.tree.pack(fill="both", expand=True, padx=SPACE_LG, pady=(SPACE_LG, SPACE_MD))
 
         # pagination controls - integrated layout
         ctrl = ctk.CTkFrame(table_container, fg_color="transparent")
-        ctrl.pack(fill="x", padx=15, pady=(10,12))
+        ctrl.pack(fill="x", padx=SPACE_LG, pady=(SPACE_SM, SPACE_MD))
 
         self.current_page = 1
         self.page_size = 12
@@ -91,9 +103,13 @@ class StudentsView(ctk.CTkFrame):
         self.prev_btn = ctk.CTkButton(
             left_ctrl, 
             text="◀ Prev", 
-            width=80, 
-            fg_color=BTN_PRIMARY_FG,
-            hover_color=BTN_PRIMARY_HOVER,
+            width=92,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
             text_color="white",
             command=lambda: self.change_page(-1)
         )
@@ -108,9 +124,13 @@ class StudentsView(ctk.CTkFrame):
         self.next_btn = ctk.CTkButton(
             left_ctrl, 
             text="Next ▶", 
-            width=80, 
-            fg_color=BTN_PRIMARY_FG,
-            hover_color=BTN_PRIMARY_HOVER,
+            width=92,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
             text_color="white",
             command=lambda: self.change_page(1)
         )
@@ -122,14 +142,15 @@ class StudentsView(ctk.CTkFrame):
         
         ctk.CTkLabel(goto_frame, text="Go to:", font=get_font(12), text_color=TEXT_MUTED).pack(side="left", padx=(0, 5))
         
-        self.page_entry = ctk.CTkEntry(goto_frame, width=50, height=30, 
+        self.page_entry = ctk.CTkEntry(goto_frame, width=50, height=CONTROL_HEIGHT_SM,
                                        fg_color=ENTRY_BG, border_color=BORDER_COLOR,
                                        text_color=TEXT_PRIMARY, font=get_font(12))
         self.page_entry.pack(side="left", padx=(0, 5))
         self.page_entry.bind("<Return>", lambda e: self.go_to_page())
         
-        self.go_btn = ctk.CTkButton(goto_frame, text="Go", width=40, height=30,
-                                    fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER,
+        self.go_btn = ctk.CTkButton(goto_frame, text="Go", width=44, height=CONTROL_HEIGHT_SM,
+                        fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER,
+                        corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
                                     text_color="white", font=get_font(12, True),
                                     command=self.go_to_page)
         self.go_btn.pack(side="left")
@@ -142,9 +163,12 @@ class StudentsView(ctk.CTkFrame):
             right_ctrl,
             text="Edit Selected",
             width=120,
-            height=30,
-            fg_color=BTN_PRIMARY_FG,
-            hover_color=BTN_PRIMARY_HOVER,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
             text_color="white",
             font=get_font(12, True),
             command=self.edit_selected_students,
@@ -154,7 +178,10 @@ class StudentsView(ctk.CTkFrame):
             right_ctrl,
             text="Delete Selected",
             width=130,
-            height=30,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=0,
+            border_width=BORDER_WIDTH_THIN,
+            border_color=BORDER_COLOR,
             fg_color=DANGER_COLOR,
             hover_color=DANGER_HOVER,
             text_color="white",
@@ -251,8 +278,12 @@ class StudentsView(ctk.CTkFrame):
                 self.pagination_frame,
                 text="",
                 width=32,
-                height=28,
-                fg_color="#3b3b3f",
+                height=CONTROL_HEIGHT_SM,
+                corner_radius=0,
+                border_width=BORDER_WIDTH_THIN,
+                border_color=BORDER_COLOR,
+                fg_color=BTN_SEGMENT_FG,
+                hover_color=BTN_SEGMENT_HOVER,
                 command=lambda: None,
             )
             btn.pack(side="left", padx=2)
@@ -263,7 +294,7 @@ class StudentsView(ctk.CTkFrame):
             is_current = page_num == self.current_page
             btn.configure(
                 text=str(page_num),
-                fg_color=ACCENT_COLOR if is_current else "#3b3b3f",
+                fg_color=ACCENT_COLOR if is_current else BTN_SEGMENT_FG,
                 command=lambda page=page_num: self.goto_page(page),
             )
             if not btn.winfo_manager():
@@ -317,7 +348,7 @@ class StudentsView(ctk.CTkFrame):
         # account for: Treeview header (~20px) + padding (~12px) + pagination controls (~55px)
         reserved_height = 20 + 12 + 55
         usable_height = max(available_height - reserved_height, 50)
-        row_height = 48  # height of each row (matches treeview rowheight in setup_treeview_style)
+        row_height = 46  # height of each row (matches treeview rowheight in setup_treeview_style)
         new_page_size = max(8, usable_height // row_height)  # show at least 8 rows
         
         # update treeview height to match page size
@@ -571,13 +602,13 @@ class StudentsView(ctk.CTkFrame):
         container.pack(fill="both", expand=True, padx=20, pady=20)
 
         # header with avatar and name
-        header = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR)
+        header = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_STRONG, border_color=BORDER_COLOR)
         header.pack(fill="x", pady=(0, 15))
 
         header_inner = ctk.CTkFrame(header, fg_color="transparent")
         header_inner.pack(fill="x", padx=20, pady=16)
 
-        avatar = ctk.CTkFrame(header_inner, width=72, height=72, fg_color="#2d1f45", corner_radius=10)
+        avatar = ctk.CTkFrame(header_inner, width=72, height=72, fg_color=SURFACE_SECTION, corner_radius=RADIUS_SM)
         avatar.pack(side="left", padx=(0, 16))
         avatar.pack_propagate(False)
         ctk.CTkLabel(avatar, text="\U0001f464", font=get_font(32)).pack(expand=True)
@@ -593,7 +624,7 @@ class StudentsView(ctk.CTkFrame):
         btn_frame.pack(side="bottom", fill="x", pady=(15, 0))
 
         # info card with scrollable content
-        info_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=12, border_width=2, border_color=BORDER_COLOR)
+        info_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
         info_card.pack(fill="both", expand=True)
 
         info_scroll = ctk.CTkScrollableFrame(info_card, fg_color="transparent")
@@ -631,8 +662,8 @@ class StudentsView(ctk.CTkFrame):
 
         # only show edit/delete buttons if user is logged in
         if self.controller.logged_in:
-            ctk.CTkButton(btn_frame, text="Edit", command=_edit, fg_color=ACCENT_COLOR, text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(0, 5))
-            ctk.CTkButton(btn_frame, text="Delete", command=_delete, fg_color=DANGER_COLOR, text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(5, 0))
+            ctk.CTkButton(btn_frame, text="Edit", command=_edit, fg_color=ACCENT_COLOR, text_color="white", font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(0, 5))
+            ctk.CTkButton(btn_frame, text="Delete", command=_delete, fg_color=DANGER_COLOR, text_color="white", font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(5, 0))
         else:
             # show message prompting login
             login_msg = ctk.CTkLabel(btn_frame, text="🔒 Log in to edit or delete", font=get_font(13), text_color=TEXT_MUTED)
@@ -671,18 +702,18 @@ class StudentsView(ctk.CTkFrame):
         ctk.CTkLabel(form_frame, text="Edit Student Information", font=get_font(16, True)).pack(pady=(0, 20))
 
         ctk.CTkLabel(form_frame, text="Student ID", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
-        id_entry = ctk.CTkEntry(form_frame, height=40)
+        id_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
         id_entry.insert(0, student['id'])
         id_entry.configure(state="disabled")
         id_entry.pack(fill="x", pady=(0, 15))
 
         ctk.CTkLabel(form_frame, text="First Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
-        fname_entry = ctk.CTkEntry(form_frame, height=40)
+        fname_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
         fname_entry.insert(0, student['firstname'])
         fname_entry.pack(fill="x", pady=(0, 15))
 
         ctk.CTkLabel(form_frame, text="Last Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
-        lname_entry = ctk.CTkEntry(form_frame, height=40)
+        lname_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
         lname_entry.insert(0, student['lastname'])
         lname_entry.pack(fill="x", pady=(0, 15))
 
@@ -770,8 +801,8 @@ class StudentsView(ctk.CTkFrame):
         btn_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
         btn_frame.pack(fill="x", pady=(10, 0))
 
-        ctk.CTkButton(btn_frame, text="Save Changes", command=save, height=40, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 5))
-        ctk.CTkButton(btn_frame, text="Delete", command=delete, height=40, fg_color=DANGER_COLOR, hover_color=DANGER_HOVER, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
+        ctk.CTkButton(btn_frame, text="Save Changes", command=save, height=CONTROL_HEIGHT_MD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ctk.CTkButton(btn_frame, text="Delete", command=delete, height=CONTROL_HEIGHT_MD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, fg_color=DANGER_COLOR, hover_color=DANGER_HOVER, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
 
         animate_toplevel_in(edit_window, x=x, y=y)
 
@@ -952,8 +983,8 @@ class StudentsView(ctk.CTkFrame):
 
         btn_row = ctk.CTkFrame(frame, fg_color="transparent")
         btn_row.pack(fill="x", pady=(6, 0))
-        ctk.CTkButton(btn_row, text="Apply Changes", command=save_bulk, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, fg_color="#555555", text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(6, 0))
+        ctk.CTkButton(btn_row, text="Apply Changes", command=save_bulk, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER, text_color="white", font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(6, 0))
 
         animate_toplevel_in(modal, x=x, y=y)
 
@@ -1015,15 +1046,15 @@ class StudentsView(ctk.CTkFrame):
         ctk.CTkLabel(form_frame, text="New Student Enrollment", font=get_font(16, True)).pack(pady=(0, 20))
         
         ctk.CTkLabel(form_frame, text="Student ID", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
-        id_entry = ctk.CTkEntry(form_frame, placeholder_text="e.g., 2024-0001", height=40)
+        id_entry = ctk.CTkEntry(form_frame, placeholder_text="e.g., 2024-0001", height=CONTROL_HEIGHT_MD)
         id_entry.pack(fill="x", pady=(0, 15))
         
         ctk.CTkLabel(form_frame, text="First Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
-        fname_entry = ctk.CTkEntry(form_frame, placeholder_text="First Name", height=40)
+        fname_entry = ctk.CTkEntry(form_frame, placeholder_text="First Name", height=CONTROL_HEIGHT_MD)
         fname_entry.pack(fill="x", pady=(0, 15))
         
         ctk.CTkLabel(form_frame, text="Last Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
-        lname_entry = ctk.CTkEntry(form_frame, placeholder_text="Last Name", height=40)
+        lname_entry = ctk.CTkEntry(form_frame, placeholder_text="Last Name", height=CONTROL_HEIGHT_MD)
         lname_entry.pack(fill="x", pady=(0, 15))
         
         ctk.CTkLabel(form_frame, text="Gender", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
@@ -1124,11 +1155,12 @@ class StudentsView(ctk.CTkFrame):
         # button row: Save and Cancel
         btn_row = ctk.CTkFrame(form_frame, fg_color="transparent")
         btn_row.pack(fill="x", pady=(8,0))
-        ctk.CTkButton(btn_row, text="Save Student", command=save, height=40, 
-                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 6))
-        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, height=40,
-                 fg_color="#555555", text_color="white", font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(6, 0))
+        ctk.CTkButton(btn_row, text="Save Student", command=save, height=CONTROL_HEIGHT_MD,
+             fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, height=CONTROL_HEIGHT_MD,
+             fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER, text_color="white", font=FONT_BOLD, corner_radius=0, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR).pack(side="left", fill="x", expand=True, padx=(6, 0))
 
         animate_toplevel_in(modal, x=x, y=y)
+
 
 
