@@ -10,7 +10,6 @@ from config import (
     ACCENT_COLOR,
     TEXT_MUTED,
     BORDER_COLOR,
-    SURFACE_SECTION,
     FONT_BOLD,
     get_font,
     TEXT_PRIMARY,
@@ -20,8 +19,7 @@ from config import (
     BTN_PRIMARY_HOVER,
     BTN_SEGMENT_FG,
     BTN_SEGMENT_HOVER,
-    BORDER_WIDTH_THIN,
-    BORDER_WIDTH_STRONG,
+    BORDER_WIDTH_HAIRLINE,
     SPACE_SM,
     SPACE_MD,
     SPACE_LG,
@@ -52,7 +50,7 @@ class LoginFrame(ctk.CTkFrame):
             center_frame,
             fg_color=PANEL_COLOR,
             corner_radius=RADIUS_MD,
-            border_width=BORDER_WIDTH_STRONG,
+            border_width=0,
             border_color=BORDER_COLOR,
             width=540,
             height=640,
@@ -65,7 +63,7 @@ class LoginFrame(ctk.CTkFrame):
         title_strip.pack(fill="x", padx=0, pady=(0, SPACE_SM))
 
         # logo - extra large for prominent display
-        logo_frame = ctk.CTkFrame(card, fg_color=SURFACE_SECTION, corner_radius=RADIUS_SM, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
+        logo_frame = ctk.CTkFrame(card, fg_color="transparent", corner_radius=0, border_width=0)
         logo_frame.pack(pady=(SPACE_LG, SPACE_MD), padx=SPACE_LG)
         
         # load main logo - extra big
@@ -93,10 +91,9 @@ class LoginFrame(ctk.CTkFrame):
             fg_color=BTN_PRIMARY_FG,
             text_color="white",
             hover_color=BTN_PRIMARY_HOVER,
-            border_width=BORDER_WIDTH_THIN,
-            border_color=BORDER_COLOR,
+            border_width=0,
             height=CONTROL_HEIGHT_LG,
-            corner_radius=0,
+            corner_radius=RADIUS_SM,
                       command=self.handle_login).pack(fill="x", padx=50, pady=(22, 40))
 
     def on_frame_shown(self):
@@ -112,8 +109,8 @@ class LoginFrame(ctk.CTkFrame):
             parent,
             placeholder_text=placeholder,
             height=CONTROL_HEIGHT_LG,
-            corner_radius=0,
-            border_width=BORDER_WIDTH_THIN,
+            corner_radius=RADIUS_SM,
+            border_width=BORDER_WIDTH_HAIRLINE,
             border_color=BORDER_COLOR,
             fg_color=ENTRY_BG,
             text_color=TEXT_PRIMARY,
@@ -169,7 +166,7 @@ class LoginFrame(ctk.CTkFrame):
         container = ctk.CTkFrame(reg_window, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=SPACE_LG, pady=SPACE_LG)
         
-        form_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_STRONG, border_color=BORDER_COLOR)
+        form_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=0, border_color=BORDER_COLOR)
         form_card.pack(fill="both", expand=True)
         ctk.CTkFrame(form_card, fg_color=ACCENT_COLOR, height=3, corner_radius=0).pack(fill="x", pady=(0, SPACE_SM))
         frame = ctk.CTkScrollableFrame(form_card, fg_color="transparent")
@@ -232,9 +229,8 @@ class LoginFrame(ctk.CTkFrame):
             text="Register",
             command=register_user,
             height=CONTROL_HEIGHT_MD,
-            corner_radius=0,
-            border_width=BORDER_WIDTH_THIN,
-            border_color=BORDER_COLOR,
+            corner_radius=RADIUS_SM,
+            border_width=0,
             fg_color=BTN_SEGMENT_FG,
             hover_color=BTN_SEGMENT_HOVER,
             text_color="white",

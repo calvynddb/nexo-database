@@ -14,8 +14,7 @@ from config import (
     TEXT_PRIMARY,
     SURFACE_SOFT,
     ACCENT_COLOR,
-    BORDER_WIDTH_THIN,
-    BORDER_WIDTH_STRONG,
+    BORDER_WIDTH_HAIRLINE,
     RADIUS_LG,
     RADIUS_SM,
 )
@@ -26,7 +25,7 @@ class DepthCard(ctk.CTkFrame):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("fg_color", PANEL_COLOR)
         kwargs.setdefault("corner_radius", RADIUS_LG)
-        kwargs.setdefault("border_width", BORDER_WIDTH_THIN)
+        kwargs.setdefault("border_width", 0)
         kwargs.setdefault("border_color", BORDER_COLOR)
         super().__init__(*args, **kwargs)
 
@@ -41,7 +40,7 @@ class StatCard(DepthCard):
             parent,
             fg_color=PANEL_COLOR,
             corner_radius=RADIUS_LG,
-            border_width=BORDER_WIDTH_STRONG,
+            border_width=BORDER_WIDTH_HAIRLINE,
             border_color=BORDER_COLOR,
             height=height,
             **kwargs,

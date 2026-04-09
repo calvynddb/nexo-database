@@ -7,14 +7,13 @@ import tkinter as tk
 import time
 from config import (
     PANEL_COLOR,
-    ACCENT_COLOR,
     TEXT_PRIMARY,
     BORDER_COLOR,
     ENTRY_BG,
     SURFACE_HOVER,
     BTN_SEGMENT_FG,
     BTN_SEGMENT_HOVER,
-    BORDER_WIDTH_THIN,
+    BORDER_WIDTH_HAIRLINE,
     CONTROL_HEIGHT_MD,
     CONTROL_HEIGHT_SM,
     RADIUS_SM,
@@ -43,14 +42,14 @@ class SearchableComboBox(ctk.CTkFrame):
         # text entry
         self.entry = ctk.CTkEntry(main_frame, placeholder_text=kwargs.get("placeholder", "Select..."),
                        height=kwargs.get("height", CONTROL_HEIGHT_MD), fg_color=ENTRY_BG,
-                                   border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
+                                   border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR)
         self.entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
         
         # dropdown button with arrow
         self.dropdown_btn = ctk.CTkButton(main_frame, text="▼", width=40, height=kwargs.get("height", CONTROL_HEIGHT_MD),
                          fg_color=BTN_SEGMENT_FG, text_color=TEXT_PRIMARY,
                                          hover_color=BTN_SEGMENT_HOVER,
-                                         border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
+                                         border_width=0,
                                          command=self._toggle_dropdown)
         self.dropdown_btn.grid(row=0, column=1, sticky="e")
         
@@ -120,7 +119,7 @@ class SearchableComboBox(ctk.CTkFrame):
             self.dropdown.configure(fg_color=PANEL_COLOR)
 
             self.list_frame = ctk.CTkFrame(self.dropdown, fg_color=PANEL_COLOR,
-                                          border_width=BORDER_WIDTH_THIN, border_color=ACCENT_COLOR, corner_radius=RADIUS_SM)
+                                          border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR, corner_radius=RADIUS_SM)
             self.list_frame.pack(fill="both", expand=True)
         else:
             try:
@@ -218,14 +217,14 @@ class StyledComboBox(ctk.CTkFrame):
         # display label
         self.entry = ctk.CTkEntry(main_frame, placeholder_text=kwargs.get("placeholder", "Select..."),
                        height=kwargs.get("height", CONTROL_HEIGHT_MD), fg_color=ENTRY_BG,
-                                   border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR)
+                                   border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR)
         self.entry.grid(row=0, column=0, sticky="ew", padx=(0, 4))
         
         # dropdown button with arrow
         self.dropdown_btn = ctk.CTkButton(main_frame, text="▼", width=40, height=kwargs.get("height", CONTROL_HEIGHT_MD),
                          fg_color=BTN_SEGMENT_FG, text_color=TEXT_PRIMARY,
                                          hover_color=BTN_SEGMENT_HOVER,
-                                         border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
+                                         border_width=0,
                                          command=self._show_menu)
         self.dropdown_btn.grid(row=0, column=1, sticky="e")
         
@@ -255,7 +254,7 @@ class StyledComboBox(ctk.CTkFrame):
             self.dropdown.configure(fg_color=PANEL_COLOR)
 
             self.list_frame = ctk.CTkFrame(self.dropdown, fg_color=PANEL_COLOR,
-                                           border_width=BORDER_WIDTH_THIN, border_color=ACCENT_COLOR, corner_radius=RADIUS_SM)
+                                           border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR, corner_radius=RADIUS_SM)
             self.list_frame.pack(fill="both", expand=True)
         else:
             try:
@@ -377,7 +376,7 @@ class SmartSearchEntry(ctk.CTkEntry):
             self.dropdown.configure(fg_color=PANEL_COLOR)
 
             self.list_frame = ctk.CTkFrame(self.dropdown, fg_color=PANEL_COLOR,
-                                            border_width=BORDER_WIDTH_THIN, border_color=ACCENT_COLOR, corner_radius=RADIUS_SM)
+                                            border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR, corner_radius=RADIUS_SM)
             self.list_frame.pack(fill="both", expand=True)
         else:
             try:

@@ -22,6 +22,7 @@ from config import (
     TABLE_HEADER_BG,
     TABLE_HEADER_HOVER,
     TABLE_HEADER_FG,
+    BORDER_WIDTH_HAIRLINE,
     ANIMATIONS_ENABLED,
     REDUCED_MOTION,
     RADIUS_SM,
@@ -72,7 +73,7 @@ class SoftLoadingOverlay:
             self._overlay,
             fg_color=SURFACE_SECTION,
             corner_radius=RADIUS_MD,
-            border_width=2,
+            border_width=BORDER_WIDTH_HAIRLINE,
             border_color=BORDER_COLOR,
         )
         panel.grid(row=0, column=0, padx=20, pady=20, sticky="")

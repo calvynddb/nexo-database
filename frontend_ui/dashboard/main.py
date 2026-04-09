@@ -18,7 +18,7 @@ from config import (
     SUCCESS_COLOR, SUCCESS_HOVER, DANGER_COLOR, DANGER_HOVER,
     CONTROL_HEIGHT_SM, CONTROL_HEIGHT_MD, CONTROL_HEIGHT_LG,
     RADIUS_SM, RADIUS_MD, RADIUS_LG,
-    BORDER_WIDTH_THIN, BORDER_WIDTH_STRONG,
+    BORDER_WIDTH_HAIRLINE,
     SPACE_SM, SPACE_MD, SPACE_LG,
     SURFACE_SECTION,
     BTN_SEGMENT_FG, BTN_SEGMENT_HOVER,
@@ -110,7 +110,7 @@ class DashboardFrame(ctk.CTkFrame):
             height=86,
             fg_color=PANEL_COLOR,
             corner_radius=RADIUS_MD,
-            border_width=BORDER_WIDTH_STRONG,
+            border_width=0,
             border_color=BORDER_COLOR,
         )
         topbar.pack(fill="both", expand=True)
@@ -150,7 +150,7 @@ class DashboardFrame(ctk.CTkFrame):
             center_frame,
             fg_color=SURFACE_SECTION,
             corner_radius=RADIUS_SM,
-            border_width=BORDER_WIDTH_THIN,
+            border_width=0,
             border_color=BORDER_COLOR,
         )
         nav_rail.grid(row=0, column=0, sticky="nsew", padx=(SPACE_SM, SPACE_SM))
@@ -178,9 +178,9 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=TEXT_PRIMARY,
             hover_color=BTN_SEGMENT_HOVER,
             font=get_font(13, True),
-            corner_radius=0,
+            corner_radius=RADIUS_SM,
             height=CONTROL_HEIGHT_LG,
-            border_width=BORDER_WIDTH_THIN,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=lambda: self.show_view(self._StudentsView)
         )
@@ -196,9 +196,9 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=TEXT_PRIMARY,
             hover_color=BTN_SEGMENT_HOVER,
             font=get_font(13, True),
-            corner_radius=0,
+            corner_radius=RADIUS_SM,
             height=CONTROL_HEIGHT_LG,
-            border_width=BORDER_WIDTH_THIN,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=lambda: self.show_view(self._ProgramsView)
         )
@@ -214,9 +214,9 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=TEXT_PRIMARY,
             hover_color=BTN_SEGMENT_HOVER,
             font=get_font(13, True),
-            corner_radius=0,
+            corner_radius=RADIUS_SM,
             height=CONTROL_HEIGHT_LG,
-            border_width=BORDER_WIDTH_THIN,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=lambda: self.show_view(self._CollegesView)
         )
@@ -256,7 +256,7 @@ class DashboardFrame(ctk.CTkFrame):
             height=86,
             fg_color=PANEL_COLOR,
             corner_radius=RADIUS_MD,
-            border_width=BORDER_WIDTH_STRONG,
+            border_width=0,
             border_color=BORDER_COLOR,
         )
         title_bar.pack(fill="both", expand=True)
@@ -281,7 +281,7 @@ class DashboardFrame(ctk.CTkFrame):
         # center: search bar
         self.search_entry = ctk.CTkEntry(inner, placeholder_text="Search", height=CONTROL_HEIGHT_MD,
                          fg_color=ENTRY_BG, border_color=BORDER_COLOR,
-                         border_width=BORDER_WIDTH_THIN,
+                         border_width=BORDER_WIDTH_HAIRLINE,
                          text_color=TEXT_PRIMARY, font=get_font(13))
         self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 15))
         self.search_entry.bind("<KeyRelease>", self.handle_search_dynamic)
@@ -295,8 +295,8 @@ class DashboardFrame(ctk.CTkFrame):
         self._refresh_icon = get_icon("refresh", size=20, fallback_color=ACCENT_COLOR)
         self.refresh_btn = ctk.CTkButton(button_container, text="", image=self._refresh_icon,
                                         width=46, height=CONTROL_HEIGHT_LG, fg_color=BTN_NEUTRAL_FG,
-                                        hover_color=BTN_NEUTRAL_HOVER, border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
-                                        corner_radius=0, command=self.handle_refresh)
+                                        hover_color=BTN_NEUTRAL_HOVER, border_width=0,
+                                        corner_radius=RADIUS_SM, command=self.handle_refresh)
         self.refresh_btn.pack(side="left", padx=(0, 10))
 
         self.multi_edit_btn = ctk.CTkButton(
@@ -308,8 +308,8 @@ class DashboardFrame(ctk.CTkFrame):
             fg_color=BTN_SEGMENT_FG,
             text_color=TEXT_PRIMARY,
             hover_color=BTN_SEGMENT_HOVER,
-            corner_radius=0,
-            border_width=BORDER_WIDTH_THIN,
+            corner_radius=RADIUS_SM,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=self.toggle_multi_edit_mode,
         )
@@ -324,8 +324,8 @@ class DashboardFrame(ctk.CTkFrame):
             fg_color=BTN_SEGMENT_FG,
             text_color=TEXT_PRIMARY,
             hover_color=BTN_SEGMENT_HOVER,
-            corner_radius=0,
-            border_width=BORDER_WIDTH_THIN,
+            corner_radius=RADIUS_SM,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=self.toggle_filter_panel,
         )
@@ -334,8 +334,8 @@ class DashboardFrame(ctk.CTkFrame):
         # add entry button
         self.add_btn = ctk.CTkButton(button_container, text="Add Entry", width=110, height=CONTROL_HEIGHT_LG,
                                     font=get_font(12, True),
-                        fg_color=BTN_PRIMARY_FG, text_color=TEXT_PRIMARY, corner_radius=0,
-                        border_width=BORDER_WIDTH_THIN, border_color=BORDER_COLOR,
+                        fg_color=BTN_PRIMARY_FG, text_color=TEXT_PRIMARY, corner_radius=RADIUS_SM,
+                        border_width=0,
                         hover_color=BTN_PRIMARY_HOVER,
                                     command=self.handle_add_entry)
         self.add_btn.pack(side="left", padx=(0, 0))
@@ -365,7 +365,7 @@ class DashboardFrame(ctk.CTkFrame):
             self.filter_panel_wrapper,
             fg_color=PANEL_COLOR,
             corner_radius=RADIUS_SM,
-            border_width=BORDER_WIDTH_STRONG,
+            border_width=0,
             border_color=BORDER_COLOR,
         )
         filter_card.pack(fill="x", expand=True)
@@ -407,8 +407,8 @@ class DashboardFrame(ctk.CTkFrame):
             fg_color=BTN_PRIMARY_FG,
             text_color="white",
             hover_color=BTN_PRIMARY_HOVER,
-            corner_radius=0,
-            border_width=BORDER_WIDTH_THIN,
+            corner_radius=RADIUS_SM,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=self.apply_current_filters,
         )
@@ -423,8 +423,8 @@ class DashboardFrame(ctk.CTkFrame):
             fg_color=BTN_SEGMENT_FG,
             text_color="white",
             hover_color=BTN_SEGMENT_HOVER,
-            corner_radius=0,
-            border_width=BORDER_WIDTH_THIN,
+            corner_radius=RADIUS_SM,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=self.reset_current_filters,
         )
@@ -439,8 +439,8 @@ class DashboardFrame(ctk.CTkFrame):
             fg_color=BTN_SEGMENT_FG,
             text_color=TEXT_PRIMARY,
             hover_color=BTN_SEGMENT_HOVER,
-            corner_radius=0,
-            border_width=BORDER_WIDTH_THIN,
+            corner_radius=RADIUS_SM,
+            border_width=0,
             border_color=BORDER_COLOR,
             command=self.toggle_filter_panel,
         )
@@ -835,6 +835,7 @@ class DashboardFrame(ctk.CTkFrame):
                         placeholder_text=field.get("placeholder", field["label"]),
                         height=30,
                         fg_color=ENTRY_BG,
+                        border_width=BORDER_WIDTH_HAIRLINE,
                         border_color=BORDER_COLOR,
                         text_color=TEXT_PRIMARY,
                         font=get_font(11),
@@ -1031,7 +1032,7 @@ class DashboardFrame(ctk.CTkFrame):
         container = ctk.CTkFrame(panel, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
 
-        card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=1, border_color=BORDER_COLOR)
+        card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR)
         card.pack(fill="both", expand=True)
 
         scroll = ctk.CTkScrollableFrame(card, fg_color="transparent")
@@ -1044,16 +1045,19 @@ class DashboardFrame(ctk.CTkFrame):
 
         def _make_entry(parent, placeholder):
             e = ctk.CTkEntry(parent, placeholder_text=placeholder, height=CONTROL_HEIGHT_MD,
-                             fg_color=ENTRY_BG, border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
+                             fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
+                             border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
             e.pack(fill="x", pady=(0, 8))
             return e
 
         reg_user = _make_entry(scroll, "Username")
         reg_pass = ctk.CTkEntry(scroll, placeholder_text="Password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
+                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
+                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
         reg_pass.pack(fill="x", pady=(0, 8))
         reg_conf = ctk.CTkEntry(scroll, placeholder_text="Confirm password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
+                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
+                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
         reg_conf.pack(fill="x", pady=(0, 12))
 
         def _register():
@@ -1094,13 +1098,16 @@ class DashboardFrame(ctk.CTkFrame):
 
         chg_user = _make_entry(scroll, "Username to update")
         chg_old  = ctk.CTkEntry(scroll, placeholder_text="Current password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
+                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
+                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
         chg_old.pack(fill="x", pady=(0, 8))
         chg_new  = ctk.CTkEntry(scroll, placeholder_text="New password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
+                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
+                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
         chg_new.pack(fill="x", pady=(0, 8))
         chg_conf = ctk.CTkEntry(scroll, placeholder_text="Confirm new password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
+                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
+                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
         chg_conf.pack(fill="x", pady=(0, 12))
 
         def _change_creds():
@@ -1155,7 +1162,7 @@ class DashboardFrame(ctk.CTkFrame):
         container.pack(fill="both", expand=True, padx=16, pady=16)
         
         from frontend_ui.ui import DepthCard
-        settings_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=1, border_color=BORDER_COLOR)
+        settings_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR)
         settings_card.pack(fill="both", expand=True)
         frame = ctk.CTkScrollableFrame(settings_card, fg_color="transparent")
         frame.pack(fill="both", expand=True, padx=16, pady=16)
