@@ -6,7 +6,7 @@ styling centralized.
 """
 
 import customtkinter as ctk
-from config import get_font, PANEL_COLOR, BORDER_COLOR, TEXT_MUTED
+from config import get_font, PANEL_COLOR, BORDER_COLOR, TEXT_MUTED, SURFACE_SOFT
 
 
 class DepthCard(ctk.CTkFrame):
@@ -29,7 +29,7 @@ class StatCard(DepthCard):
         inner = ctk.CTkFrame(self, fg_color="transparent")
         inner.place(relx=0.5, rely=0.5, anchor="center")
 
-        icon_f = ctk.CTkFrame(inner, width=45, height=45, fg_color="#2d1f45", corner_radius=10)
+        icon_f = ctk.CTkFrame(inner, width=45, height=45, fg_color=SURFACE_SOFT, corner_radius=10)
         icon_f.pack(pady=(0, 4))
         icon_f.pack_propagate(False)
         lbl = ctk.CTkLabel(icon_f, image=icon_img, text="")

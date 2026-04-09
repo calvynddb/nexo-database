@@ -4,6 +4,7 @@ Utility functions for UI styling and assets.
 
 import customtkinter as ctk
 import tkinter as tk
+import os
 import time
 from pathlib import Path
 from config import (
@@ -11,6 +12,9 @@ from config import (
     TEXT_MUTED,
     BORDER_COLOR,
     PANEL_SELECTED,
+    TABLE_HEADER_BG,
+    TABLE_HEADER_HOVER,
+    TABLE_HEADER_FG,
     ANIMATIONS_ENABLED,
     REDUCED_MOTION,
     get_font,
@@ -21,6 +25,20 @@ from config import (
 
 # icon cache to avoid reloading
 _icon_cache = {}
+_UI_TIMING_ENABLED = str(os.getenv("NEXO_UI_TIMING", "")).strip().lower() in {
+    "1",
+    "true",
+    "yes",
+    "on",
+}
+
+
+def log_ui_timing(label: str, started_at: float, warn_ms: int = 90) -> float:
+    """Log UI timings only when slow (or when timing mode is explicitly enabled)."""
+    elapsed_ms = (time.perf_counter() - started_at) * 1000.0
+    if _UI_TIMING_ENABLED or elapsed_ms >= max(0, int(warn_ms)):
+        print(f"[ui-timing] {label}: {elapsed_ms:.1f}ms")
+    return elapsed_ms
 
 
 class SoftLoadingOverlay:
@@ -362,7 +380,7 @@ def setup_treeview_style():
     style.configure(
         "Treeview", 
         background=PANEL_COLOR,
-        foreground="#dcdcdc",
+        foreground="#e2e8f0",
         rowheight=48,
         fieldbackground=PANEL_COLOR,
         borderwidth=0,
@@ -372,22 +390,19 @@ def setup_treeview_style():
         padding=2
     )
     style.map('Treeview', background=[('selected', PANEL_SELECTED)])
-    # make headings look like interactive buttons with distinct styling
-    HEADING_BG = "#13101a"       # slightly darker than panel — distinct header row
-    HEADING_HOVER = "#2d1f45"    # purple tint on hover — signals interactivity
-    HEADING_FG = "#a8a8b5"       # slightly brighter than TEXT_MUTED for contrast
+    # make headings look like modern, clickable controls
     style.configure(
         "Treeview.Heading",
-        background=HEADING_BG,
-        foreground=HEADING_FG,
+        background=TABLE_HEADER_BG,
+        foreground=TABLE_HEADER_FG,
         relief="flat",
         borderwidth=0,
         padding=(8, 12),
         font=get_font(13, True)
     )
     style.map("Treeview.Heading", 
-              background=[('active', HEADING_HOVER)],
-              foreground=[('active', '#e8e8f0')])
+              background=[('active', TABLE_HEADER_HOVER)],
+              foreground=[('active', '#e2e8f0')])
 
     # remove focus ring highlight
     try:

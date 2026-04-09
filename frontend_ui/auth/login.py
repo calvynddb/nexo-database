@@ -4,7 +4,21 @@ Login and authentication for nexo.
 
 import customtkinter as ctk
 
-from config import BG_COLOR, PANEL_COLOR, ACCENT_COLOR, TEXT_MUTED, BORDER_COLOR, FONT_BOLD, get_font, TEXT_PRIMARY
+from config import (
+    BG_COLOR,
+    PANEL_COLOR,
+    ACCENT_COLOR,
+    TEXT_MUTED,
+    BORDER_COLOR,
+    FONT_BOLD,
+    get_font,
+    TEXT_PRIMARY,
+    TITLE_COLOR,
+    ENTRY_BG,
+    BTN_PRIMARY_FG,
+    BTN_PRIMARY_HOVER,
+    CONTROL_HEIGHT_LG,
+)
 from frontend_ui.ui import DepthCard, get_icon, get_main_logo
 
 
@@ -22,7 +36,7 @@ class LoginFrame(ctk.CTkFrame):
         center_frame.grid_columnconfigure(0, weight=1)
 
         # clean, flat card with depth effect - dark themed
-        card = DepthCard(center_frame, fg_color=PANEL_COLOR, corner_radius=20, border_width=2, border_color=BORDER_COLOR, width=520, height=640)
+        card = DepthCard(center_frame, fg_color=PANEL_COLOR, corner_radius=20, border_width=2, border_color=BORDER_COLOR, width=520, height=620)
         card.grid(row=0, column=0, padx=20, pady=20)
         card.grid_propagate(False)
         card.pack_propagate(False)
@@ -38,10 +52,10 @@ class LoginFrame(ctk.CTkFrame):
             lbl.image = self._logo_img
             lbl.pack()
         except Exception:
-            ctk.CTkLabel(logo_frame, text="nexo", font=get_font(32, True), text_color=ACCENT_COLOR).pack()
+            ctk.CTkLabel(logo_frame, text="nexo", font=get_font(32, True), text_color=TITLE_COLOR).pack()
 
-        ctk.CTkLabel(card, text="nexo", font=get_font(28, True), text_color=TEXT_PRIMARY).pack(pady=(0, 8))
-        ctk.CTkLabel(card, text="Please login to access the administrative features", font=get_font(12), text_color=TEXT_MUTED).pack(pady=(0, 30))
+        ctk.CTkLabel(card, text="nexo", font=get_font(30, True), text_color=TITLE_COLOR).pack(pady=(0, 8))
+        ctk.CTkLabel(card, text="Administrative Access", font=get_font(12), text_color=TEXT_MUTED).pack(pady=(0, 28))
 
         self.username_entry = self.create_input(card, "Username", "👤  Enter your username")
         self.password_entry = self.create_input(card, "Password", "🔒  Enter your password", show="*")
@@ -49,7 +63,7 @@ class LoginFrame(ctk.CTkFrame):
         self.password_entry.bind("<Return>", lambda e: self.handle_login())
 
         # templated login function with enhanced button
-        ctk.CTkButton(card, text="Sign In", font=get_font(13, True), fg_color=ACCENT_COLOR, text_color="white", hover_color="#6d5a8a", height=48, corner_radius=10, 
+        ctk.CTkButton(card, text="Sign In", font=get_font(13, True), fg_color=BTN_PRIMARY_FG, text_color="white", hover_color=BTN_PRIMARY_HOVER, height=CONTROL_HEIGHT_LG, corner_radius=10,
                       command=self.handle_login).pack(fill="x", padx=50, pady=(22, 40))
 
     def on_frame_shown(self):
@@ -61,7 +75,7 @@ class LoginFrame(ctk.CTkFrame):
 
     def create_input(self, parent, label, placeholder, show=""):
         ctk.CTkLabel(parent, text=label, font=get_font(12, True), text_color=TEXT_PRIMARY).pack(anchor="w", padx=50, pady=(10, 4))
-        entry = ctk.CTkEntry(parent, placeholder_text=placeholder, height=48, border_color=BORDER_COLOR, fg_color="#2A1F3D", text_color="#d1d1d1", show=show)
+        entry = ctk.CTkEntry(parent, placeholder_text=placeholder, height=CONTROL_HEIGHT_LG, border_color=BORDER_COLOR, fg_color=ENTRY_BG, text_color=TEXT_PRIMARY, show=show)
         entry.pack(fill="x", padx=50, pady=(0, 12))
         return entry
 
@@ -170,4 +184,4 @@ class LoginFrame(ctk.CTkFrame):
             reg_window.destroy()
         
         ctk.CTkButton(frame, text="Register", command=register_user, height=40,
-                       fg_color=ACCENT_COLOR, text_color="white", font=FONT_BOLD).pack(fill="x")
+                       fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER, text_color="white", font=FONT_BOLD).pack(fill="x")

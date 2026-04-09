@@ -11,11 +11,12 @@ from .utils import (
     get_main_logo,
     SoftLoadingOverlay,
     animate_toplevel_in,
+    log_ui_timing,
 )
 
 __all__ = [
     "DepthCard", "StatCard",
     "SmartSearchEntry", "SearchableComboBox", "StyledComboBox",
     "setup_treeview_style", "placeholder_image", "get_icon", "get_main_logo",
-    "SoftLoadingOverlay", "animate_toplevel_in"
+    "SoftLoadingOverlay", "animate_toplevel_in", "log_ui_timing"
 ]

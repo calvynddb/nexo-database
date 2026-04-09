@@ -34,23 +34,68 @@ ctk.set_appearance_mode("dark")
 ctk.set_default_color_theme("dark-blue")  # using dark-blue theme, but will override blue colors in code
 
 # --- fonts ---
-# century gothic - clean, modern font for professional look
-FONT_MAIN = ("Century Gothic", 14)
-FONT_BOLD = ("Century Gothic", 14, "bold")
-FONT_FAMILY = "Century Gothic"
+# Modern system-friendly typography for a cleaner UI hierarchy.
+FONT_FAMILY = "Segoe UI"
+FONT_MAIN = (FONT_FAMILY, 14)
+FONT_BOLD = (FONT_FAMILY, 14, "bold")
 
 def get_font(size: int = 14, bold: bool = False):
     """Return a font tuple for widgets: (family, size[, 'bold'])."""
     return (FONT_FAMILY, size, "bold") if bold else (FONT_FAMILY, size)
 
-# --- colors --- subtle dark purple theme with purple accents
-BG_COLOR = "#0d0d12"  # very dark background (nearly black)
-PANEL_COLOR = "#1a1620"  # dark card background (subtle warm undertone)
-ACCENT_COLOR = "#5a4a7a"  # subtle muted purple (primary accent)
-TEXT_MUTED = "#8a8a95"  # muted gray-blue (darker for readability)
-TEXT_PRIMARY = "#e8e8f0"  # soft off-white for main text
-BORDER_COLOR = "#2a1f35"  # subtle purple border for definition
-PANEL_SELECTED = "#2d1f45"  # subtle purple selection highlight
+# --- colors --- bold-product dark aesthetic
+BG_COLOR = "#0b1220"
+PANEL_COLOR = "#111a2b"
+ACCENT_COLOR = "#2563eb"
+TEXT_MUTED = "#94a3b8"
+TEXT_PRIMARY = "#e2e8f0"
+BORDER_COLOR = "#253452"
+PANEL_SELECTED = "#22385f"
+
+# semantic surfaces and control colors
+TITLE_COLOR = "#dbeafe"
+SURFACE_SOFT = "#172338"
+SURFACE_INPUT = "#0f1b30"
+SURFACE_HOVER = "#1f3050"
+
+BTN_PRIMARY_FG = ACCENT_COLOR
+BTN_PRIMARY_HOVER = "#1d4ed8"
+BTN_SECONDARY_FG = "#243652"
+BTN_SECONDARY_HOVER = "#30466a"
+BTN_NEUTRAL_FG = "#1a2740"
+BTN_NEUTRAL_HOVER = "#263a5f"
+BTN_DISABLED_FG = "#334155"
+
+SUCCESS_COLOR = "#15803d"
+SUCCESS_HOVER = "#166534"
+DANGER_COLOR = "#c41e3a"
+DANGER_HOVER = "#a31a31"
+
+ENTRY_BG = SURFACE_INPUT
+ENTRY_TEXT = TEXT_PRIMARY
+
+TABLE_ODD_BG = "#111d31"
+TABLE_EVEN_BG = "#0d1728"
+TABLE_HOVER_BG = "#27426b"
+TABLE_HEADER_BG = "#0f1b2f"
+TABLE_HEADER_HOVER = "#1d2f4c"
+TABLE_HEADER_FG = "#b8c7de"
+
+# common sizing and spacing tokens
+SPACE_XS = 4
+SPACE_SM = 8
+SPACE_MD = 12
+SPACE_LG = 16
+SPACE_XL = 20
+
+RADIUS_SM = 8
+RADIUS_MD = 12
+RADIUS_LG = 15
+RADIUS_XL = 20
+
+CONTROL_HEIGHT_SM = 30
+CONTROL_HEIGHT_MD = 40
+CONTROL_HEIGHT_LG = 48
 
 # --- window dimensions ---
 WINDOW_WIDTH = 1400
@@ -61,12 +106,12 @@ WINDOW_HEIGHT = 940
 ANIMATIONS_ENABLED = True
 REDUCED_MOTION = False
 MOTION_DURATIONS_MS = {
-    "frame_transition": 150,
-    "dialog_open": 125,
-    "dialog_close": 100,
-    "panel_expand": 145,
-    "loading_overlay": 130,
-    "filter_apply": 140,
+    "frame_transition": 120,
+    "dialog_open": 105,
+    "dialog_close": 85,
+    "panel_expand": 120,
+    "loading_overlay": 100,
+    "filter_apply": 95,
     # legacy aliases (kept for compatibility with older call sites)
     "dialog_enter": 125,
     "dialog_exit": 100,
@@ -90,16 +135,16 @@ def get_motion_duration(name: str, fallback: int = 140) -> int:
 
     return max(0, duration)
 
-# --- chart colors --- subtle purple palette
+# --- chart colors --- cool, high-contrast palette
 COLOR_PALETTE = [
-    '#5a4a7a',  # subtle muted purple (primary)
-    '#6d5a8a',  # muted purple-gray
-    '#7a6a95',  # medium muted purple
-    '#4a3a65',  # deep subtle purple
-    '#3a2a50',  # very deep purple
-    '#5a7a8a',  # muted blue-gray
-    '#6a7a8a',  # muted slate
-    '#5a8a7a'   # muted teal (subtle cool tone)
+    '#2563eb',
+    '#0ea5e9',
+    '#14b8a6',
+    '#4f46e5',
+    '#6366f1',
+    '#0284c7',
+    '#06b6d4',
+    '#0d9488'
 ]
 
 # --- Global Theme Manager ---

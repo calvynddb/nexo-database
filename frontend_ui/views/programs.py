@@ -3,13 +3,16 @@ Programs view module extracted from original views.py
 """
 import customtkinter as ctk
 import tkinter as tk
+import time
 from tkinter import ttk
 
 # matplotlib & numpy are lazy-loaded inside create_donut_chart() to speed up startup
 
 from config import (
-    FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR, 
-    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY
+    FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR,
+    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY,
+    BTN_PRIMARY_FG, BTN_PRIMARY_HOVER, DANGER_COLOR, DANGER_HOVER,
+    ENTRY_BG, TABLE_ODD_BG, TABLE_EVEN_BG, TABLE_HOVER_BG
 )
 from config import get_font
 from frontend_ui.ui import (
@@ -19,6 +22,7 @@ from frontend_ui.ui import (
     get_icon,
     StyledComboBox,
     animate_toplevel_in,
+    log_ui_timing,
 )
 from backend import validate_program
 
@@ -66,9 +70,9 @@ class ProgramsView(ctk.CTkFrame):
         self.tree.bind("<ButtonRelease-1>", self.on_row_click)
         self.tree.bind("<Double-1>", self.on_row_double_click)
         self.tree.bind("<<TreeviewSelect>>", lambda _event: self._refresh_checkmarks())
-        self.tree.tag_configure('odd', background="#1a1620")
-        self.tree.tag_configure('even', background="#0f0d12")
-        self.tree.tag_configure('hover', background="#6d5a8a", foreground="#ffffff")
+        self.tree.tag_configure('odd', background=TABLE_ODD_BG)
+        self.tree.tag_configure('even', background=TABLE_EVEN_BG)
+        self.tree.tag_configure('hover', background=TABLE_HOVER_BG, foreground="#ffffff")
 
         # pagination controls - integrated layout
         ctrl = ctk.CTkFrame(table_container, fg_color="transparent")
@@ -83,7 +87,7 @@ class ProgramsView(ctk.CTkFrame):
         left_ctrl = ctk.CTkFrame(ctrl, fg_color="transparent")
         left_ctrl.pack(side="left")
         
-        self.prev_btn = ctk.CTkButton(left_ctrl, text="◀ Prev", width=80, fg_color="#6d28d9", hover_color="#5b21b6", text_color="white", command=lambda: self.change_page(-1))
+        self.prev_btn = ctk.CTkButton(left_ctrl, text="◀ Prev", width=80, fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER, text_color="white", command=lambda: self.change_page(-1))
         self.prev_btn.pack(side="left", padx=(0,8))
         
         self.pagination_frame = ctk.CTkFrame(left_ctrl, fg_color="transparent")
@@ -91,7 +95,7 @@ class ProgramsView(ctk.CTkFrame):
         self.page_buttons = []
         
         # next Button - right next to pagination
-        self.next_btn = ctk.CTkButton(left_ctrl, text="Next ▶", width=80, fg_color="#6d28d9", hover_color="#5b21b6", text_color="white", command=lambda: self.change_page(1))
+        self.next_btn = ctk.CTkButton(left_ctrl, text="Next ▶", width=80, fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER, text_color="white", command=lambda: self.change_page(1))
         self.next_btn.pack(side="left", padx=(8,0))
         
         # go to page section
@@ -101,13 +105,13 @@ class ProgramsView(ctk.CTkFrame):
         ctk.CTkLabel(goto_frame, text="Go to:", font=get_font(12), text_color=TEXT_MUTED).pack(side="left", padx=(0, 5))
         
         self.page_entry = ctk.CTkEntry(goto_frame, width=50, height=30, 
-                                       fg_color="#2A1F3D", border_color=BORDER_COLOR,
+                                       fg_color=ENTRY_BG, border_color=BORDER_COLOR,
                                        text_color=TEXT_PRIMARY, font=get_font(12))
         self.page_entry.pack(side="left", padx=(0, 5))
         self.page_entry.bind("<Return>", lambda e: self.go_to_page())
         
         self.go_btn = ctk.CTkButton(goto_frame, text="Go", width=40, height=30,
-                                    fg_color="#6d28d9", hover_color="#5b21b6",
+                                    fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER,
                                     text_color="white", font=get_font(12, True),
                                     command=self.go_to_page)
         self.go_btn.pack(side="left")
@@ -121,8 +125,8 @@ class ProgramsView(ctk.CTkFrame):
             text="Edit Selected",
             width=120,
             height=30,
-            fg_color="#1d4ed8",
-            hover_color="#1e40af",
+            fg_color=BTN_PRIMARY_FG,
+            hover_color=BTN_PRIMARY_HOVER,
             text_color="white",
             font=get_font(12, True),
             command=self.edit_selected_programs,
@@ -133,8 +137,8 @@ class ProgramsView(ctk.CTkFrame):
             text="Delete Selected",
             width=130,
             height=30,
-            fg_color="#c41e3a",
-            hover_color="#a31a31",
+            fg_color=DANGER_COLOR,
+            hover_color=DANGER_HOVER,
             text_color="white",
             font=get_font(12, True),
             command=self.delete_selected_programs,
@@ -175,7 +179,7 @@ class ProgramsView(ctk.CTkFrame):
             f.pack(fill="x", padx=20, pady=5)
             ctk.CTkLabel(f, text=p, font=get_font(13, True)).pack(side="left")
             ctk.CTkLabel(f, text=f"{val} Students", text_color=TEXT_MUTED).pack(side="right")
-            bar = ctk.CTkProgressBar(top_card, progress_color=colors_list[i], fg_color="#2A1F3D", height=8)
+            bar = ctk.CTkProgressBar(top_card, progress_color=colors_list[i], fg_color=ENTRY_BG, height=8)
             bar.pack(fill="x", padx=20, pady=(0, 15))
             try:
                 from ui.utils import animate_progress
@@ -271,6 +275,7 @@ class ProgramsView(ctk.CTkFrame):
         self._last_hover = None
 
     def _render_page(self):
+        started_at = time.perf_counter()
         total = len(self._last_page_items)
         per = self.page_size
         total_pages = max(1, (total + per - 1) // per)
@@ -304,30 +309,42 @@ class ProgramsView(ctk.CTkFrame):
             display_text = "Showing 0 of 0 entries"
         self.entry_count_label.configure(text=display_text)
         
-        for btn in self.page_buttons:
-            btn.destroy()
-        self.page_buttons.clear()
-        
         start_page = max(1, self.current_page - 2)
         end_page = min(total_pages, start_page + 4)
         if end_page - start_page < 4:
             start_page = max(1, end_page - 4)
-        
-        for p in range(start_page, end_page + 1):
-            is_current = p == self.current_page
+
+        visible_pages = list(range(start_page, end_page + 1))
+        while len(self.page_buttons) < len(visible_pages):
             btn = ctk.CTkButton(
-                self.pagination_frame, 
-                text=str(p), 
-                width=32, 
+                self.pagination_frame,
+                text="",
+                width=32,
                 height=28,
-                fg_color=ACCENT_COLOR if is_current else "#3b3b3f",
-                command=lambda page=p: self.goto_page(page)
+                fg_color="#3b3b3f",
+                command=lambda: None,
             )
             btn.pack(side="left", padx=2)
             self.page_buttons.append(btn)
+
+        for idx, page_num in enumerate(visible_pages):
+            btn = self.page_buttons[idx]
+            is_current = page_num == self.current_page
+            btn.configure(
+                text=str(page_num),
+                fg_color=ACCENT_COLOR if is_current else "#3b3b3f",
+                command=lambda page=page_num: self.goto_page(page),
+            )
+            if not btn.winfo_manager():
+                btn.pack(side="left", padx=2)
+
+        for btn in self.page_buttons[len(visible_pages):]:
+            if btn.winfo_manager():
+                btn.pack_forget()
         
         self.prev_btn.configure(state=("normal" if self.current_page > 1 else "disabled"))
         self.next_btn.configure(state=("normal" if self.current_page < total_pages else "disabled"))
+        log_ui_timing("table.render.programs", started_at, warn_ms=65)
     
     def goto_page(self, page):
         self.current_page = page
@@ -391,7 +408,7 @@ class ProgramsView(ctk.CTkFrame):
             f.pack(fill="x", padx=20, pady=5)
             ctk.CTkLabel(f, text=p, font=get_font(13, True)).pack(side="left")
             ctk.CTkLabel(f, text=f"{val} Students", text_color=TEXT_MUTED).pack(side="right")
-            bar = ctk.CTkProgressBar(top_card, progress_color=colors_list[i], fg_color="#2A1F3D", height=8)
+            bar = ctk.CTkProgressBar(top_card, progress_color=colors_list[i], fg_color=ENTRY_BG, height=8)
             bar.pack(fill="x", padx=20, pady=(0, 15))
             try:
                 from ui.utils import animate_progress
@@ -615,7 +632,6 @@ class ProgramsView(ctk.CTkFrame):
         x = (profile_window.winfo_screenwidth() // 2) - (profile_window.winfo_width() // 2)
         y = (profile_window.winfo_screenheight() // 2) - (profile_window.winfo_height() // 2)
         profile_window.geometry(f"+{x}+{y}")
-        animate_toplevel_in(profile_window, x=x, y=y)
 
         container = ctk.CTkFrame(profile_window, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
@@ -695,11 +711,13 @@ class ProgramsView(ctk.CTkFrame):
         # only show edit/delete buttons if user is logged in
         if self.controller.logged_in:
             ctk.CTkButton(btn_frame, text="Edit", command=_edit, fg_color=ACCENT_COLOR, text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(0, 5))
-            ctk.CTkButton(btn_frame, text="Delete", command=_delete, fg_color="#c41e3a", text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(5, 0))
+            ctk.CTkButton(btn_frame, text="Delete", command=_delete, fg_color=DANGER_COLOR, text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(5, 0))
         else:
             # show message prompting login
             login_msg = ctk.CTkLabel(btn_frame, text="🔒 Log in to edit or delete", font=get_font(13), text_color=TEXT_MUTED)
             login_msg.pack(fill="x", pady=10)
+
+        animate_toplevel_in(profile_window, x=x, y=y)
 
     def add_program(self):
         # check authentication
@@ -721,7 +739,6 @@ class ProgramsView(ctk.CTkFrame):
         x = (modal.winfo_screenwidth() // 2) - (modal.winfo_width() // 2)
         y = (modal.winfo_screenheight() // 2) - (modal.winfo_height() // 2)
         modal.geometry(f"500x{height}+{x}+{y}")
-        animate_toplevel_in(modal, x=x, y=y)
         
         form_frame = ctk.CTkFrame(modal, fg_color="transparent")
         form_frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -816,6 +833,8 @@ class ProgramsView(ctk.CTkFrame):
                  fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0,6))
         ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, height=40,
                  fg_color="#555555", text_color="white", font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(6,0))
+
+        animate_toplevel_in(modal, x=x, y=y)
 
     def show_context_menu_program(self, event):
         item = self.tree.identify('item', event.x, event.y)
@@ -973,7 +992,6 @@ class ProgramsView(ctk.CTkFrame):
         x = (modal.winfo_screenwidth() // 2) - (modal.winfo_width() // 2)
         y = (modal.winfo_screenheight() // 2) - (modal.winfo_height() // 2)
         modal.geometry(f"+{x}+{y}")
-        animate_toplevel_in(modal, x=x, y=y)
 
         frame = ctk.CTkFrame(modal, fg_color="transparent")
         frame.pack(fill="both", expand=True, padx=20, pady=20)
@@ -1037,6 +1055,8 @@ class ProgramsView(ctk.CTkFrame):
         ctk.CTkButton(btn_row, text="Apply Changes", command=save_bulk, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(0, 6))
         ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, fg_color="#555555", text_color="white", font=FONT_BOLD, height=40).pack(side="left", fill="x", expand=True, padx=(6, 0))
 
+        animate_toplevel_in(modal, x=x, y=y)
+
     def _refresh_checkmarks(self):
         for item in self.tree.get_children():
             if not self.multi_edit_mode:
@@ -1087,7 +1107,6 @@ class ProgramsView(ctk.CTkFrame):
         x = (edit_window.winfo_screenwidth() // 2) - (edit_window.winfo_width() // 2)
         y = (edit_window.winfo_screenheight() // 2) - (edit_window.winfo_height() // 2)
         edit_window.geometry(f"+{x}+{y}")
-        animate_toplevel_in(edit_window, x=x, y=y)
         
         container = ctk.CTkFrame(edit_window, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=16, pady=16)
@@ -1179,5 +1198,7 @@ class ProgramsView(ctk.CTkFrame):
         ctk.CTkButton(button_frame, text="Save Changes", command=save, height=40,
                      fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 5))
         ctk.CTkButton(button_frame, text="Delete", command=delete, height=40,
-                     fg_color="#c41e3a", font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
+                     fg_color=DANGER_COLOR, hover_color=DANGER_HOVER, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
+
+        animate_toplevel_in(edit_window, x=x, y=y)
 

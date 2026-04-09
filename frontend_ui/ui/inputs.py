@@ -4,7 +4,9 @@ Input and entry widgets for EduManage SIS.
 
 import customtkinter as ctk
 import tkinter as tk
+import time
 from config import PANEL_COLOR, ACCENT_COLOR, TEXT_PRIMARY, BORDER_COLOR, get_font
+from .utils import log_ui_timing
 
 
 class SearchableComboBox(ctk.CTkFrame):
@@ -95,6 +97,7 @@ class SearchableComboBox(ctk.CTkFrame):
     
     def _show_dropdown(self, matches):
         """Display filtered dropdown menu."""
+        started_at = time.perf_counter()
         if not self.dropdown or not self.dropdown.winfo_exists():
             self.dropdown = ctk.CTkToplevel(self.entry)
             self.dropdown.wm_overrideredirect(True)
@@ -132,6 +135,8 @@ class SearchableComboBox(ctk.CTkFrame):
                                hover_color="#2A1F3D", height=30, corner_radius=0,
                                font=get_font(13), command=lambda o=opt: self._select_option(o))
             btn.pack(fill="x", padx=1, pady=1)
+
+        log_ui_timing("dropdown.searchable", started_at, warn_ms=45)
     
     def _select_option(self, option):
         """Select an option from dropdown."""
@@ -223,6 +228,8 @@ class StyledComboBox(ctk.CTkFrame):
         if self._dropdown_is_visible():
             self._close_dropdown()
             return
+
+        started_at = time.perf_counter()
         
         if not self.dropdown or not self.dropdown.winfo_exists():
             self.dropdown = ctk.CTkToplevel(self.entry)
@@ -260,6 +267,8 @@ class StyledComboBox(ctk.CTkFrame):
                                hover_color="#2A1F3D", height=30, corner_radius=0,
                                font=get_font(13), command=lambda v=val: self._select_option(v))
             btn.pack(fill="x", padx=1, pady=1)
+
+        log_ui_timing("dropdown.styled", started_at, warn_ms=45)
     
     def _select_option(self, value):
         """Select an option."""
@@ -342,6 +351,7 @@ class SmartSearchEntry(ctk.CTkEntry):
             self._show_dropdown(matches)
 
     def _show_dropdown(self, matches):
+        started_at = time.perf_counter()
         if not self.dropdown or not self.dropdown.winfo_exists():
             self.dropdown = ctk.CTkToplevel(self)
             self.dropdown.wm_overrideredirect(True)
@@ -376,6 +386,8 @@ class SmartSearchEntry(ctk.CTkEntry):
                                 hover_color="#2A1F3D", height=30, corner_radius=0,
                                 command=lambda o=opt: self._select_option(o))
             btn.pack(fill="x", padx=5, pady=1)
+
+        log_ui_timing("dropdown.smart-search", started_at, warn_ms=45)
 
     def _select_option(self, option):
         self.delete(0, tk.END)

@@ -4,16 +4,20 @@ Dashboard main frame and navigation for nexo.
 
 import customtkinter as ctk
 import tkinter as tk
+import time
 
 
 # optional plotting libraries removed from top-level to avoid extra dependency
 # they are imported on-demand in views that need them.
 
 from config import (
-    BG_COLOR, PANEL_COLOR, ACCENT_COLOR, TEXT_MUTED, BORDER_COLOR, 
-    FONT_MAIN, FONT_BOLD, COLOR_PALETTE, get_font, get_motion_duration, TEXT_PRIMARY, THEME_MANAGER
+    BG_COLOR, PANEL_COLOR, ACCENT_COLOR, TEXT_MUTED, BORDER_COLOR,
+    FONT_MAIN, FONT_BOLD, COLOR_PALETTE, get_font, get_motion_duration, TEXT_PRIMARY, THEME_MANAGER,
+    TITLE_COLOR, ENTRY_BG, BTN_PRIMARY_FG, BTN_PRIMARY_HOVER, BTN_SECONDARY_FG,
+    BTN_SECONDARY_HOVER, BTN_NEUTRAL_FG, BTN_NEUTRAL_HOVER, BTN_DISABLED_FG,
+    SUCCESS_COLOR, SUCCESS_HOVER, DANGER_COLOR, DANGER_HOVER, CONTROL_HEIGHT_MD, CONTROL_HEIGHT_LG
 )
-from frontend_ui.ui import DepthCard, get_icon, get_main_logo, SoftLoadingOverlay, animate_toplevel_in
+from frontend_ui.ui import DepthCard, get_icon, get_main_logo, SoftLoadingOverlay, animate_toplevel_in, log_ui_timing
 from backend import create_backups
 from frontend_ui.auth import LoginFrame
 
@@ -95,7 +99,7 @@ class DashboardFrame(ctk.CTkFrame):
         topbar_wrapper.grid(row=0, column=0, sticky="ew", padx=15, pady=(15, 5))
         topbar_wrapper.grid_columnconfigure(0, weight=1)
         
-        topbar = DepthCard(topbar_wrapper, height=90, fg_color=PANEL_COLOR, corner_radius=15, 
+        topbar = DepthCard(topbar_wrapper, height=86, fg_color=PANEL_COLOR, corner_radius=15,
                           border_width=2, border_color=BORDER_COLOR)
         topbar.pack(fill="both", expand=True)
         topbar.grid_propagate(False)
@@ -123,7 +127,7 @@ class DashboardFrame(ctk.CTkFrame):
         self._logo_img = logo_img  # store as instance variable
         
         # "nexo." text - bigger and bolder, centered vertically
-        nexo_label = ctk.CTkLabel(left_section, text="nexo.", font=get_font(36, True), text_color="#9b8ba9")
+        nexo_label = ctk.CTkLabel(left_section, text="nexo.", font=get_font(34, True), text_color=TITLE_COLOR)
         nexo_label.grid(row=0, column=1, sticky="ew")
         
         # center section: centralized navigation tabs with fixed sizing
@@ -138,8 +142,8 @@ class DashboardFrame(ctk.CTkFrame):
         
         # create small placeholder icons for tabs (kept as attributes to avoid gc)
         self._tab_icon_students = get_icon("users", size=20, fallback_color=ACCENT_COLOR)
-        self._tab_icon_programs = get_icon("books", size=20, fallback_color="#6d5a8a")
-        self._tab_icon_colleges = get_icon("building", size=20, fallback_color="#7a6a95")
+        self._tab_icon_programs = get_icon("books", size=20, fallback_color=ACCENT_COLOR)
+        self._tab_icon_colleges = get_icon("building", size=20, fallback_color=ACCENT_COLOR)
 
         # students tab
         self.nav_btns[self._StudentsView] = ctk.CTkButton(
@@ -147,12 +151,12 @@ class DashboardFrame(ctk.CTkFrame):
             text="Students",
             image=self._tab_icon_students,
             compound="left",
-            fg_color="#2a1f35",
+            fg_color=BTN_SECONDARY_FG,
             text_color=TEXT_PRIMARY,
-            hover_color="#3a2f45",
+            hover_color=BTN_SECONDARY_HOVER,
             font=get_font(13, True),
             corner_radius=8,
-            height=45,
+            height=44,
             border_width=0,
             command=lambda: self.show_view(self._StudentsView)
         )
@@ -164,12 +168,12 @@ class DashboardFrame(ctk.CTkFrame):
             text="Programs",
             image=self._tab_icon_programs,
             compound="left",
-            fg_color="#2a1f35",
+            fg_color=BTN_SECONDARY_FG,
             text_color=TEXT_PRIMARY,
-            hover_color="#3a2f45",
+            hover_color=BTN_SECONDARY_HOVER,
             font=get_font(13, True),
             corner_radius=8,
-            height=45,
+            height=44,
             border_width=0,
             command=lambda: self.show_view(self._ProgramsView)
         )
@@ -181,12 +185,12 @@ class DashboardFrame(ctk.CTkFrame):
             text="Colleges",
             image=self._tab_icon_colleges,
             compound="left",
-            fg_color="#2a1f35",
+            fg_color=BTN_SECONDARY_FG,
             text_color=TEXT_PRIMARY,
-            hover_color="#3a2f45",
+            hover_color=BTN_SECONDARY_HOVER,
             font=get_font(13, True),
             corner_radius=8,
-            height=45,
+            height=44,
             border_width=0,
             command=lambda: self.show_view(self._CollegesView)
         )
@@ -197,17 +201,17 @@ class DashboardFrame(ctk.CTkFrame):
         right_frame.grid(row=0, column=2, sticky="nsew", padx=(20, 0))
         
         # login/logout button - bigger
-        self.auth_btn = ctk.CTkButton(right_frame, text="Login", fg_color=ACCENT_COLOR, 
-                                      text_color="white", hover_color="#7C3AED", 
+        self.auth_btn = ctk.CTkButton(right_frame, text="Login", fg_color=BTN_PRIMARY_FG,
+                          text_color="white", hover_color=BTN_PRIMARY_HOVER,
                                       font=get_font(12, True),
-                                      height=45, width=100, command=self.handle_login_click)
+                          height=44, width=100, command=self.handle_login_click)
         self.auth_btn.pack(side="left", padx=0)
 
         # gear/admin button - only visible when logged in
         self._gear_icon = get_icon("settings", size=20, fallback_color=ACCENT_COLOR)
         self.gear_btn = ctk.CTkButton(right_frame, text="", image=self._gear_icon,
-                                      width=45, height=45, fg_color="#2a1f35",
-                                      hover_color="#3a2f45", border_width=0,
+                                      width=44, height=44, fg_color=BTN_NEUTRAL_FG,
+                                      hover_color=BTN_NEUTRAL_HOVER, border_width=0,
                                       command=self.open_admin_panel)
         # packed/forgotten dynamically by update_auth_button
         
@@ -221,7 +225,7 @@ class DashboardFrame(ctk.CTkFrame):
         title_bar_wrapper.grid(row=1, column=0, sticky="ew", padx=15, pady=(10, 10))
         title_bar_wrapper.grid_columnconfigure(0, weight=1)
         
-        title_bar = DepthCard(title_bar_wrapper, height=90, fg_color=PANEL_COLOR, corner_radius=15,
+        title_bar = DepthCard(title_bar_wrapper, height=84, fg_color=PANEL_COLOR, corner_radius=15,
                              border_width=1, border_color=BORDER_COLOR)
         title_bar.pack(fill="both", expand=True)
         title_bar.grid_propagate(False)
@@ -238,14 +242,14 @@ class DashboardFrame(ctk.CTkFrame):
         # left: page title - aligned left, bolder, lighter purple
         self.title_label = ctk.CTkLabel(inner, text="Students",
                                        font=get_font(28, True),
-                                       text_color="#9b8ba9",
+                                       text_color=TITLE_COLOR,
                                        anchor="w")
         self.title_label.grid(row=0, column=0, sticky="ew", padx=(0, 20))
         
         # center: search bar
-        self.search_entry = ctk.CTkEntry(inner, placeholder_text="Search", height=40,
-                                         fg_color="#2A1F3D", border_color=BORDER_COLOR,
-                                         text_color=TEXT_PRIMARY, font=("Century Gothic", 14))
+        self.search_entry = ctk.CTkEntry(inner, placeholder_text="Search", height=CONTROL_HEIGHT_MD,
+                         fg_color=ENTRY_BG, border_color=BORDER_COLOR,
+                         text_color=TEXT_PRIMARY, font=get_font(13))
         self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 15))
         self.search_entry.bind("<KeyRelease>", self.handle_search_dynamic)
         
@@ -257,58 +261,43 @@ class DashboardFrame(ctk.CTkFrame):
         # use packaged icon asset for refresh (avoid absolute local paths)
         self._refresh_icon = get_icon("refresh", size=20, fallback_color=ACCENT_COLOR)
         self.refresh_btn = ctk.CTkButton(button_container, text="", image=self._refresh_icon,
-                                        width=50, height=50, fg_color="#2a1f35",
-                                        hover_color="#3a2f45", border_width=0, command=self.handle_refresh)
-        self.refresh_btn.pack(side="left", padx=(0, 8))
-
-        self.clear_search_btn = ctk.CTkButton(
-            button_container,
-            text="X",
-            width=40,
-            height=50,
-            font=get_font(13, True),
-            fg_color="#3b3b3f",
-            text_color=TEXT_PRIMARY,
-            hover_color="#4b4b50",
-            command=self.clear_current_search,
-        )
-        self.clear_search_btn.pack(side="left", padx=(0, 8), before=self.refresh_btn)
+                                        width=46, height=CONTROL_HEIGHT_LG, fg_color=BTN_NEUTRAL_FG,
+                                        hover_color=BTN_NEUTRAL_HOVER, border_width=0, command=self.handle_refresh)
+        self.refresh_btn.pack(side="left", padx=(0, 10))
 
         self.multi_edit_btn = ctk.CTkButton(
             button_container,
             text="Multi-Edit: Off",
             width=130,
-            height=50,
+            height=CONTROL_HEIGHT_LG,
             font=get_font(12, True),
-            fg_color="#3b3b3f",
+            fg_color=BTN_SECONDARY_FG,
             text_color=TEXT_PRIMARY,
-            hover_color="#4b4b50",
+            hover_color=BTN_SECONDARY_HOVER,
             command=self.toggle_multi_edit_mode,
         )
-        self.multi_edit_btn.pack(side="left", padx=(0, 8))
+        self.multi_edit_btn.pack(side="left", padx=(0, 10))
 
         self.filter_btn = ctk.CTkButton(
             button_container,
             text="Filters: Off",
             width=120,
-            height=50,
+            height=CONTROL_HEIGHT_LG,
             font=get_font(12, True),
-            fg_color="#2a1f35",
+            fg_color=BTN_NEUTRAL_FG,
             text_color=TEXT_PRIMARY,
-            hover_color="#3a2f45",
+            hover_color=BTN_NEUTRAL_HOVER,
             command=self.toggle_filter_panel,
         )
-        self.filter_btn.pack(side="left", padx=(0, 8))
+        self.filter_btn.pack(side="left", padx=(0, 10))
         
         # add entry button
-        self.add_btn = ctk.CTkButton(button_container, text="Add Entry", width=110, height=50,
+        self.add_btn = ctk.CTkButton(button_container, text="Add Entry", width=110, height=CONTROL_HEIGHT_LG,
                                     font=get_font(12, True),
-                                    fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY,
-                                    hover_color="#7C3AED",
+                        fg_color=BTN_PRIMARY_FG, text_color=TEXT_PRIMARY,
+                        hover_color=BTN_PRIMARY_HOVER,
                                     command=self.handle_add_entry)
         self.add_btn.pack(side="left", padx=(0, 0))
-
-        self._update_clear_search_button()
         
         # disable add button initially (guest mode)
         self.update_button_states()
@@ -316,11 +305,11 @@ class DashboardFrame(ctk.CTkFrame):
     def update_button_states(self):
         """Update button states based on login status."""
         if not self.controller.logged_in:
-            self.add_btn.configure(state="disabled", fg_color="#555555")
+            self.add_btn.configure(state="disabled", fg_color=BTN_DISABLED_FG)
             self.multi_edit_btn.pack_forget()
             self.set_multi_edit_mode(False)
         else:
-            self.add_btn.configure(state="normal", fg_color=ACCENT_COLOR)
+            self.add_btn.configure(state="normal", fg_color=BTN_PRIMARY_FG)
             if not self.multi_edit_btn.winfo_manager():
                 self.multi_edit_btn.pack(side="left", padx=(0, 8), before=self.add_btn)
             self.multi_edit_btn.configure(state="normal")
@@ -374,9 +363,9 @@ class DashboardFrame(ctk.CTkFrame):
             width=82,
             height=30,
             font=get_font(11, True),
-            fg_color=ACCENT_COLOR,
+            fg_color=BTN_PRIMARY_FG,
             text_color="white",
-            hover_color="#7C3AED",
+            hover_color=BTN_PRIMARY_HOVER,
             command=self.apply_current_filters,
         )
         self.apply_filters_btn.pack(side="left", padx=(0, 6))
@@ -387,9 +376,9 @@ class DashboardFrame(ctk.CTkFrame):
             width=76,
             height=30,
             font=get_font(11, True),
-            fg_color="#44444a",
+            fg_color=BTN_SECONDARY_FG,
             text_color="white",
-            hover_color="#56565f",
+            hover_color=BTN_SECONDARY_HOVER,
             command=self.reset_current_filters,
         )
         self.reset_filters_btn.pack(side="left", padx=(0, 6))
@@ -400,9 +389,9 @@ class DashboardFrame(ctk.CTkFrame):
             width=70,
             height=30,
             font=get_font(11, True),
-            fg_color="#2a1f35",
+            fg_color=BTN_NEUTRAL_FG,
             text_color=TEXT_PRIMARY,
-            hover_color="#3a2f45",
+            hover_color=BTN_NEUTRAL_HOVER,
             command=self.toggle_filter_panel,
         )
         self.hide_filters_btn.pack(side="left")
@@ -414,6 +403,7 @@ class DashboardFrame(ctk.CTkFrame):
 
     def toggle_filter_panel(self):
         """Show or hide the advanced filter panel."""
+        started_at = time.perf_counter()
         target_visible = not self.filter_panel_visible
         if not target_visible:
             # Persist while controls are still visible.
@@ -435,6 +425,8 @@ class DashboardFrame(ctk.CTkFrame):
             self._update_filter_button_state(self._active_filter_count(state))
         else:
             self._update_filter_button_state(0)
+
+        log_ui_timing("filters.toggle", started_at, warn_ms=70)
 
     def _cancel_filter_panel_animation(self):
         if self._filter_panel_after_id:
@@ -644,11 +636,11 @@ class DashboardFrame(ctk.CTkFrame):
         active_count = max(0, int(active_count))
         if self.filter_panel_visible:
             text = f"Filters: On ({active_count})" if active_count else "Filters: On"
-            self.filter_btn.configure(text=text, fg_color="#15803d", hover_color="#166534")
+            self.filter_btn.configure(text=text, fg_color=SUCCESS_COLOR, hover_color=SUCCESS_HOVER)
             return
 
         text = f"Filters: {active_count}" if active_count else "Filters: Off"
-        self.filter_btn.configure(text=text, fg_color="#2a1f35", hover_color="#3a2f45")
+        self.filter_btn.configure(text=text, fg_color=BTN_NEUTRAL_FG, hover_color=BTN_NEUTRAL_HOVER)
 
     def _persist_search_state(self):
         if not self.current_view or not hasattr(self, "search_entry"):
@@ -663,39 +655,6 @@ class DashboardFrame(ctk.CTkFrame):
         self.search_entry.delete(0, "end")
         if query:
             self.search_entry.insert(0, query)
-        self._update_clear_search_button()
-
-    def _update_clear_search_button(self):
-        if not hasattr(self, "clear_search_btn") or not hasattr(self, "search_entry"):
-            return
-
-        has_query = bool(self.search_entry.get().strip())
-        if not self.clear_search_btn.winfo_manager():
-            self.clear_search_btn.pack(side="left", padx=(0, 8), before=self.refresh_btn)
-
-        if has_query:
-            self.clear_search_btn.configure(
-                state="normal",
-                fg_color="#3b3b3f",
-                hover_color="#4b4b50",
-                text_color=TEXT_PRIMARY,
-            )
-        else:
-            self.clear_search_btn.configure(
-                state="disabled",
-                fg_color="#2a1f35",
-                hover_color="#2a1f35",
-                text_color="#7a7a84",
-            )
-
-    def clear_current_search(self):
-        if not self.search_entry.get().strip():
-            return
-
-        self.search_entry.delete(0, "end")
-        self._persist_search_state()
-        self._update_clear_search_button()
-        self._schedule_filter_apply()
 
     def _schedule_filter_apply(self):
         if self._is_building_filter_controls:
@@ -811,9 +770,9 @@ class DashboardFrame(ctk.CTkFrame):
                         variable=var,
                         values=values,
                         height=30,
-                        fg_color="#2A1F3D",
-                        button_color="#4c1d95",
-                        button_hover_color="#5b21b6",
+                        fg_color=ENTRY_BG,
+                        button_color=BTN_PRIMARY_FG,
+                        button_hover_color=BTN_PRIMARY_HOVER,
                         text_color=TEXT_PRIMARY,
                         font=get_font(11),
                         command=self._on_filter_option_changed,
@@ -825,7 +784,7 @@ class DashboardFrame(ctk.CTkFrame):
                         textvariable=var,
                         placeholder_text=field.get("placeholder", field["label"]),
                         height=30,
-                        fg_color="#2A1F3D",
+                        fg_color=ENTRY_BG,
                         border_color=BORDER_COLOR,
                         text_color=TEXT_PRIMARY,
                         font=get_font(11),
@@ -849,8 +808,9 @@ class DashboardFrame(ctk.CTkFrame):
         if self._is_building_filter_controls and not force:
             return
 
+        started_at = time.perf_counter()
+
         self._persist_search_state()
-        self._update_clear_search_button()
         self._persist_filter_state_from_widgets()
         query = self.search_entry.get().strip().lower()
         filters = dict(self.view_filter_state.get(self.current_view, {}))
@@ -872,6 +832,7 @@ class DashboardFrame(ctk.CTkFrame):
             view.refresh_table()
 
         self._update_filter_summary(self.current_view)
+        log_ui_timing(f"filters.apply.{type(view).__name__.lower()}", started_at, warn_ms=110)
 
     def reset_current_filters(self):
         """Reset advanced filters for the active view and re-apply search results."""
@@ -941,7 +902,7 @@ class DashboardFrame(ctk.CTkFrame):
             if vc == view_class:
                 btn.configure(fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY)
             else:
-                btn.configure(fg_color="#2a1f35", text_color=TEXT_PRIMARY)
+                btn.configure(fg_color=BTN_SECONDARY_FG, hover_color=BTN_SECONDARY_HOVER, text_color=TEXT_PRIMARY)
         
         # update title and button label based on view
         self.update_title_card(view_class)
@@ -977,7 +938,6 @@ class DashboardFrame(ctk.CTkFrame):
     def handle_search_dynamic(self, event):
         """Debounced live search; advanced filters apply via Apply button or Enter."""
         self._persist_search_state()
-        self._update_clear_search_button()
         self._schedule_filter_apply()
 
     def toggle_multi_edit_mode(self):
@@ -993,9 +953,9 @@ class DashboardFrame(ctk.CTkFrame):
         self.multi_edit_mode = enabled
 
         if enabled:
-            self.multi_edit_btn.configure(text="Multi-Edit: On", fg_color="#15803d", hover_color="#166534")
+            self.multi_edit_btn.configure(text="Multi-Edit: On", fg_color=SUCCESS_COLOR, hover_color=SUCCESS_HOVER)
         else:
-            self.multi_edit_btn.configure(text="Multi-Edit: Off", fg_color="#3b3b3f", hover_color="#4b4b50")
+            self.multi_edit_btn.configure(text="Multi-Edit: Off", fg_color=BTN_SECONDARY_FG, hover_color=BTN_SECONDARY_HOVER)
 
         if hasattr(self, "views"):
             for view in self.views.values():
@@ -1017,7 +977,6 @@ class DashboardFrame(ctk.CTkFrame):
         x = (panel.winfo_screenwidth() // 2) - (panel.winfo_width() // 2)
         y = (panel.winfo_screenheight() // 2) - (panel.winfo_height() // 2)
         panel.geometry(f"+{x}+{y}")
-        animate_toplevel_in(panel, x=x, y=y, duration_ms=get_motion_duration("dialog_open", 160))
 
         container = ctk.CTkFrame(panel, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=20, pady=20)
@@ -1125,6 +1084,8 @@ class DashboardFrame(ctk.CTkFrame):
                       fg_color="#6d28d9", text_color="white", hover_color="#5b21b6",
                       command=_change_creds).pack(fill="x", pady=(0, 8))
 
+        animate_toplevel_in(panel, x=x, y=y, duration_ms=get_motion_duration("dialog_open", 160))
+
     def open_settings(self):
         """Open Settings window."""
         settings_window = ctk.CTkToplevel(self)
@@ -1139,12 +1100,6 @@ class DashboardFrame(ctk.CTkFrame):
         x = (settings_window.winfo_screenwidth() // 2) - (settings_window.winfo_width() // 2)
         y = (settings_window.winfo_screenheight() // 2) - (settings_window.winfo_height() // 2)
         settings_window.geometry(f"+{x}+{y}")
-        animate_toplevel_in(
-            settings_window,
-            x=x,
-            y=y,
-            duration_ms=get_motion_duration("dialog_open", 160),
-        )
         
         container = ctk.CTkFrame(settings_window, fg_color="transparent")
         container.pack(fill="both", expand=True, padx=16, pady=16)
@@ -1203,6 +1158,13 @@ class DashboardFrame(ctk.CTkFrame):
         ctk.CTkButton(frame, text="Export Data", height=40, font=FONT_MAIN,
                      fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color="#7C3AED").pack(fill="x", pady=6)
 
+        animate_toplevel_in(
+            settings_window,
+            x=x,
+            y=y,
+            duration_ms=get_motion_duration("dialog_open", 160),
+        )
+
     def apply_theme(self, choice: str):
         """Apply appearance mode safely and notify all listeners."""
         try:
@@ -1250,11 +1212,11 @@ class DashboardFrame(ctk.CTkFrame):
     def update_auth_button(self):
         """Update the auth button based on login state."""
         if self.controller.logged_in:
-            self.auth_btn.configure(text="Logout", fg_color="#c41e3a", hover_color="#a01830", 
+            self.auth_btn.configure(text="Logout", fg_color=DANGER_COLOR, hover_color=DANGER_HOVER,
                                     command=self.handle_logout)
             self.gear_btn.pack(side="left", padx=(8, 0))
         else:
-            self.auth_btn.configure(text="Login", fg_color=ACCENT_COLOR, hover_color="#7C3AED", 
+            self.auth_btn.configure(text="Login", fg_color=BTN_PRIMARY_FG, hover_color=BTN_PRIMARY_HOVER,
                                     command=self.handle_login_click)
             self.gear_btn.pack_forget()
 
