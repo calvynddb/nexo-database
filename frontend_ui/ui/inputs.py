@@ -360,6 +360,34 @@ class SearchableComboBox(ctk.CTkFrame):
             else:
                 self._close_dropdown()
 
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to entry and dropdown elements."""
+        tokens = tokens or {}
+        self.entry.configure(
+            fg_color=tokens.get("ENTRY_BG", ENTRY_BG),
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+        )
+        self.dropdown_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+        )
+
+        if self.dropdown and self.dropdown.winfo_exists():
+            self.dropdown.configure(fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR))
+        if self.list_frame and self.list_frame.winfo_exists():
+            self.list_frame.configure(
+                fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR),
+                border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            )
+        for btn in self._option_buttons:
+            if btn.winfo_exists():
+                btn.configure(
+                    text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+                    hover_color=tokens.get("SURFACE_HOVER", SURFACE_HOVER),
+                )
+
 
 class StyledComboBox(ctk.CTkFrame):
     """A styled combo box widget matching SearchableComboBox appearance."""
@@ -488,6 +516,34 @@ class StyledComboBox(ctk.CTkFrame):
         self.entry.insert(0, value)
         self._value = value
 
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to entry and dropdown elements."""
+        tokens = tokens or {}
+        self.entry.configure(
+            fg_color=tokens.get("ENTRY_BG", ENTRY_BG),
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+        )
+        self.dropdown_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+        )
+
+        if self.dropdown and self.dropdown.winfo_exists():
+            self.dropdown.configure(fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR))
+        if self.list_frame and self.list_frame.winfo_exists():
+            self.list_frame.configure(
+                fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR),
+                border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            )
+            for child in self.list_frame.winfo_children():
+                if isinstance(child, ctk.CTkButton):
+                    child.configure(
+                        text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+                        hover_color=tokens.get("SURFACE_HOVER", SURFACE_HOVER),
+                    )
+
 
 class SmartSearchEntry(ctk.CTkEntry):
     """Entry widget with smart dropdown suggestions."""
@@ -595,3 +651,26 @@ class SmartSearchEntry(ctk.CTkEntry):
         self.dropdown = None
         self.list_frame = None
         self._dropdown_visible = False
+
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to search entry and dropdown."""
+        tokens = tokens or {}
+        self.configure(
+            fg_color=tokens.get("ENTRY_BG", ENTRY_BG),
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+        )
+
+        if self.dropdown and self.dropdown.winfo_exists():
+            self.dropdown.configure(fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR))
+        if self.list_frame and self.list_frame.winfo_exists():
+            self.list_frame.configure(
+                fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR),
+                border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            )
+            for child in self.list_frame.winfo_children():
+                if isinstance(child, ctk.CTkButton):
+                    child.configure(
+                        text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+                        hover_color=tokens.get("SURFACE_HOVER", SURFACE_HOVER),
+                    )

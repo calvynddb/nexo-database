@@ -27,6 +27,7 @@ class PaginationControl(ctk.CTkFrame):
         self.slot_count = max(1, int(slot_count))
         self.current_page = 1
         self.total_pages = 1
+        self._tokens = {}
 
         self.first_btn = ctk.CTkButton(
             self,
@@ -153,6 +154,9 @@ class PaginationControl(ctk.CTkFrame):
         if callable(self._on_page_change):
             self._on_page_change(page)
 
+    def _color(self, key: str, fallback: str) -> str:
+        return str(self._tokens.get(key, fallback))
+
     def _go_first(self):
         self._request_page(1)
 
@@ -202,8 +206,8 @@ class PaginationControl(ctk.CTkFrame):
                 btn.configure(
                     text=" ",
                     state="disabled",
-                    fg_color=BTN_SEGMENT_FG,
-                    hover_color=BTN_SEGMENT_HOVER,
+                    fg_color=self._color("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+                    hover_color=self._color("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
                     command=lambda: None,
                 )
                 continue
@@ -212,8 +216,8 @@ class PaginationControl(ctk.CTkFrame):
             btn.configure(
                 text=str(page_num),
                 state="normal",
-                fg_color=ACCENT_COLOR if is_current else BTN_SEGMENT_FG,
-                hover_color=BTN_SEGMENT_HOVER,
+                fg_color=self._color("ACCENT_COLOR", ACCENT_COLOR) if is_current else self._color("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+                hover_color=self._color("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
                 command=lambda page=page_num: self._request_page(page),
             )
 
@@ -223,3 +227,32 @@ class PaginationControl(ctk.CTkFrame):
         self.prev_btn.configure(state="normal" if has_prev else "disabled")
         self.next_btn.configure(state="normal" if has_next else "disabled")
         self.last_btn.configure(state="normal" if has_next else "disabled")
+
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens and refresh pagination visuals."""
+        self._tokens = dict(tokens or {})
+
+        segment = self._color("BTN_SEGMENT_FG", BTN_SEGMENT_FG)
+        segment_hover = self._color("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER)
+        text_primary = self._color("TEXT_PRIMARY", TEXT_PRIMARY)
+        text_muted = self._color("TEXT_MUTED", TEXT_MUTED)
+
+        for btn in (self.first_btn, self.prev_btn, self.next_btn, self.last_btn, self.go_btn):
+            btn.configure(
+                fg_color=segment,
+                hover_color=segment_hover,
+                border_color=self._color("BORDER_COLOR", BORDER_COLOR),
+                text_color=text_primary,
+            )
+
+        self.page_entry.configure(
+            fg_color=self._color("ENTRY_BG", ENTRY_BG),
+            border_color=self._color("BORDER_COLOR", BORDER_COLOR),
+            text_color=text_primary,
+        )
+
+        for child in self.winfo_children():
+            if isinstance(child, ctk.CTkLabel):
+                child.configure(text_color=text_muted)
+
+        self.update(self.current_page, self.total_pages)

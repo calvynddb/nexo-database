@@ -35,6 +35,13 @@ class DepthCard(ctk.CTkFrame):
 
         super().__init__(*args, **kwargs)
 
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to this card."""
+        self.configure(
+            fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR),
+            border_color=tokens.get("SHADOW_EDGE_COLOR", SHADOW_EDGE_COLOR),
+        )
+
 
 class StatCard(DepthCard):
     """Reusable stat card matching the Students sidebar style.
@@ -53,16 +60,30 @@ class StatCard(DepthCard):
         )
         self.pack(fill="x", pady=(0, 12))
         self.pack_propagate(False)
+        self._icon_img = icon_img
 
         # center all content using a single inner frame
         inner = ctk.CTkFrame(self, fg_color="transparent")
         inner.place(relx=0.5, rely=0.5, anchor="center")
+        self.inner = inner
 
-        icon_f = ctk.CTkFrame(inner, width=42, height=42, fg_color=SURFACE_SOFT, corner_radius=RADIUS_SM)
-        icon_f.pack(pady=(0, 4))
-        icon_f.pack_propagate(False)
-        lbl = ctk.CTkLabel(icon_f, image=icon_img, text="")
-        lbl.image = icon_img
-        lbl.place(relx=0.5, rely=0.5, anchor="center")
-        ctk.CTkLabel(inner, text=num, font=get_font(24, True), text_color=TEXT_PRIMARY).pack()
-        ctk.CTkLabel(inner, text=sub, font=get_font(12), text_color=TEXT_MUTED).pack()
+        self.icon_frame = ctk.CTkFrame(inner, width=42, height=42, fg_color=SURFACE_SOFT, corner_radius=RADIUS_SM)
+        self.icon_frame.pack(pady=(0, 4))
+        self.icon_frame.pack_propagate(False)
+
+        self.icon_label = ctk.CTkLabel(self.icon_frame, image=icon_img, text="")
+        self.icon_label.image = icon_img
+        self.icon_label.place(relx=0.5, rely=0.5, anchor="center")
+
+        self.value_label = ctk.CTkLabel(inner, text=num, font=get_font(24, True), text_color=TEXT_PRIMARY)
+        self.value_label.pack()
+
+        self.subtitle_label = ctk.CTkLabel(inner, text=sub, font=get_font(12), text_color=TEXT_MUTED)
+        self.subtitle_label.pack()
+
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to stat card internals."""
+        super().apply_theme_colors(tokens)
+        self.icon_frame.configure(fg_color=tokens.get("SURFACE_SOFT", SURFACE_SOFT))
+        self.value_label.configure(text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY))
+        self.subtitle_label.configure(text_color=tokens.get("TEXT_MUTED", TEXT_MUTED))

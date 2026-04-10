@@ -13,6 +13,10 @@ import time
 from config import (
     BG_COLOR, PANEL_COLOR, ACCENT_COLOR, TEXT_MUTED, BORDER_COLOR,
     FONT_MAIN, FONT_BOLD, COLOR_PALETTE, get_font, get_motion_duration, TEXT_PRIMARY, THEME_MANAGER,
+    apply_theme as apply_app_theme,
+    get_theme_preference,
+    THEME_PRESET_LABELS,
+    THEME_PRESET_SWATCHES,
     TITLE_COLOR, ENTRY_BG, BTN_PRIMARY_FG, BTN_PRIMARY_HOVER, BTN_SECONDARY_FG,
     BTN_SECONDARY_HOVER, BTN_NEUTRAL_FG, BTN_NEUTRAL_HOVER, BTN_DISABLED_FG,
     SUCCESS_COLOR, SUCCESS_HOVER, DANGER_COLOR, DANGER_HOVER,
@@ -57,6 +61,9 @@ class DashboardFrame(ctk.CTkFrame):
         self._filter_controls_data_signature = {}
         self._filter_schema_cache = {}
         self._filter_panel_after_id = None
+        self._theme_window = None
+        self._theme_controls = {}
+        self._theme_flash = None
 
         # lazy-import views here (not at module level) so matplotlib/numpy
         # are not loaded until the dashboard is actually constructed.
@@ -72,6 +79,7 @@ class DashboardFrame(ctk.CTkFrame):
         
         # register as theme listener for dynamic updates
         THEME_MANAGER.register_listener(self.on_theme_change)
+        self.bind("<Destroy>", self._on_destroy)
         
         # initialize logged_in state from controller
         # (defaults to False for guest mode)
@@ -105,6 +113,11 @@ class DashboardFrame(ctk.CTkFrame):
             view.grid(row=0, column=0, sticky="nsew")
 
         self.show_view(self._StudentsView)
+        self.on_theme_change(
+            THEME_MANAGER.get_current_mode(),
+            THEME_MANAGER.get_current_preset(),
+            THEME_MANAGER.get_current_tokens(),
+        )
 
     def create_topbar(self):
         """Create unified top navigation bar with logo, text, tabs, and controls."""
@@ -112,6 +125,7 @@ class DashboardFrame(ctk.CTkFrame):
         topbar_wrapper = ctk.CTkFrame(self, fg_color="transparent")
         topbar_wrapper.grid(row=0, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_LG, SPACE_SM))
         topbar_wrapper.grid_columnconfigure(0, weight=1)
+        self.topbar_wrapper = topbar_wrapper
         
         topbar = DepthCard(
             topbar_wrapper,
@@ -123,10 +137,12 @@ class DashboardFrame(ctk.CTkFrame):
         )
         topbar.pack(fill="both", expand=True)
         topbar.grid_propagate(False)
+        self.topbar_card = topbar
         
         # main container with three sections
         inner = ctk.CTkFrame(topbar, fg_color="transparent")
         inner.grid(row=0, column=0, sticky="nsew", padx=(SPACE_LG, SPACE_LG), pady=(SPACE_SM, SPACE_SM))
+        self.topbar_inner = inner
         topbar.grid_rowconfigure(0, weight=1)
         topbar.grid_columnconfigure(0, weight=1)
         inner.grid_rowconfigure(0, weight=1)
@@ -149,6 +165,7 @@ class DashboardFrame(ctk.CTkFrame):
         # "nexo." text - bigger and bolder, centered vertically
         nexo_label = ctk.CTkLabel(left_section, text="nexo.", font=get_font(34, True), text_color=TITLE_COLOR)
         nexo_label.grid(row=0, column=1, sticky="ew")
+        self.nexo_label = nexo_label
         
         # center section: centralized navigation tabs with fixed sizing
         center_frame = ctk.CTkFrame(inner, fg_color="transparent")
@@ -162,6 +179,7 @@ class DashboardFrame(ctk.CTkFrame):
             border_color=BORDER_COLOR,
         )
         nav_rail.grid(row=0, column=0, sticky="nsew", padx=(SPACE_SM, SPACE_SM))
+        self.nav_rail = nav_rail
         center_frame.grid_rowconfigure(0, weight=1)
         center_frame.grid_columnconfigure(0, weight=1)
         nav_rail.grid_rowconfigure(0, weight=1)
@@ -233,6 +251,7 @@ class DashboardFrame(ctk.CTkFrame):
         # right section: login/logout button
         right_frame = ctk.CTkFrame(inner, fg_color="transparent")
         right_frame.grid(row=0, column=2, sticky="nsew", padx=(20, 0))
+        self.topbar_right_frame = right_frame
         
         # login/logout button - bigger
         self.auth_btn = ctk.CTkButton(right_frame, text="Login", fg_color=BTN_PRIMARY_FG,
@@ -241,12 +260,12 @@ class DashboardFrame(ctk.CTkFrame):
                           height=CONTROL_HEIGHT_LG, width=100, command=self.handle_login_click)
         self.auth_btn.pack(side="left", padx=0)
 
-        # gear/admin button - only visible when logged in
+        # gear/theme button - only visible when logged in
         self._gear_icon = get_icon("settings", size=20, fallback_color=ACCENT_COLOR)
         self.gear_btn = ctk.CTkButton(right_frame, text="", image=self._gear_icon,
                                       width=44, height=44, fg_color=BTN_NEUTRAL_FG,
                                       hover_color=BTN_NEUTRAL_HOVER, border_width=0,
-                                      command=self.open_admin_panel)
+                          command=self.open_theme_management)
         # packed/forgotten dynamically by update_auth_button
         
         # update auth button state
@@ -258,6 +277,7 @@ class DashboardFrame(ctk.CTkFrame):
         title_bar_wrapper = ctk.CTkFrame(self, fg_color="transparent")
         title_bar_wrapper.grid(row=1, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_SM, SPACE_MD))
         title_bar_wrapper.grid_columnconfigure(0, weight=1)
+        self.title_bar_wrapper = title_bar_wrapper
         
         title_bar = DepthCard(
             title_bar_wrapper,
@@ -269,9 +289,11 @@ class DashboardFrame(ctk.CTkFrame):
         )
         title_bar.pack(fill="both", expand=True)
         title_bar.grid_propagate(False)
+        self.title_bar_card = title_bar
         
         inner = ctk.CTkFrame(title_bar, fg_color="transparent")
         inner.grid(row=0, column=0, sticky="nsew", padx=SPACE_LG, pady=(SPACE_MD, SPACE_MD))
+        self.title_bar_inner = inner
         title_bar.grid_rowconfigure(0, weight=1)
         title_bar.grid_columnconfigure(0, weight=1)
         inner.grid_columnconfigure(0, weight=0)
@@ -279,7 +301,7 @@ class DashboardFrame(ctk.CTkFrame):
         inner.grid_columnconfigure(2, weight=0)
         inner.grid_rowconfigure(0, weight=1)
         
-        # left: page title - aligned left, bolder, lighter purple
+        # left: page title - aligned left, bolder, theme-accented title tone
         self.title_label = ctk.CTkLabel(inner, text="Students",
                                        font=get_font(28, True),
                                        text_color=TITLE_COLOR,
@@ -297,6 +319,7 @@ class DashboardFrame(ctk.CTkFrame):
         # right: button container
         button_container = ctk.CTkFrame(inner, fg_color="transparent")
         button_container.grid(row=0, column=2, sticky="e", padx=(0, SPACE_SM))
+        self.title_button_container = button_container
         
         # refresh button with icon
         # use packaged icon asset for refresh (avoid absolute local paths)
@@ -366,6 +389,7 @@ class DashboardFrame(ctk.CTkFrame):
     def create_filter_panel(self):
         """Initialize advanced filter popup state."""
         self.filter_window = None
+        self.filter_card = None
         self.filter_title_label = None
         self.filter_summary_label = None
         self.apply_filters_btn = None
@@ -397,6 +421,7 @@ class DashboardFrame(ctk.CTkFrame):
             border_color=BORDER_COLOR,
         )
         filter_card.pack(fill="both", expand=True)
+        self.filter_card = filter_card
 
         content = ctk.CTkFrame(filter_card, fg_color="transparent")
         content.pack(fill="both", expand=True, padx=SPACE_MD, pady=SPACE_SM)
@@ -1012,237 +1037,338 @@ class DashboardFrame(ctk.CTkFrame):
                 if hasattr(view, "set_multi_edit_mode"):
                     view.set_multi_edit_mode(enabled)
 
-    def open_admin_panel(self):
-        """Open admin management panel for registering admins and changing credentials."""
-        from frontend_ui.ui import DepthCard
+    def open_theme_management(self):
+        """Open Theme Management window with mode and preset controls."""
+        existing = getattr(self, "_theme_window", None)
+        if existing is not None and existing.winfo_exists():
+            existing.deiconify()
+            existing.lift()
+            existing.focus_force()
+            return
 
-        panel = ctk.CTkToplevel(self)
-        panel.title("Admin Management")
-        apply_window_icon(panel)
-        panel.geometry("480x560")
-        panel.configure(fg_color=BG_COLOR)
-        panel.attributes('-topmost', True)
-        panel.grab_set()
-        panel.focus_force()
-        panel.update_idletasks()
-        x = (panel.winfo_screenwidth() // 2) - (panel.winfo_width() // 2)
-        y = (panel.winfo_screenheight() // 2) - (panel.winfo_height() // 2)
-        panel.geometry(f"+{x}+{y}")
+        theme_window = ctk.CTkToplevel(self)
+        theme_window.title("Theme Management")
+        apply_window_icon(theme_window)
+        theme_window.geometry("520x420")
+        theme_window.configure(fg_color=BG_COLOR)
+        theme_window.attributes("-topmost", True)
+        theme_window.grab_set()
+        theme_window.focus_force()
+        self._theme_window = theme_window
 
-        container = ctk.CTkFrame(panel, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=20, pady=20)
+        def _on_close():
+            try:
+                theme_window.destroy()
+            finally:
+                self._theme_window = None
+                self._theme_controls = {}
 
-        card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR)
-        card.pack(fill="both", expand=True)
+        theme_window.protocol("WM_DELETE_WINDOW", _on_close)
 
-        scroll = ctk.CTkScrollableFrame(card, fg_color="transparent")
-        scroll.pack(fill="both", expand=True, padx=16, pady=16)
+        theme_window.update_idletasks()
+        x = (theme_window.winfo_screenwidth() // 2) - (theme_window.winfo_width() // 2)
+        y = (theme_window.winfo_screenheight() // 2) - (theme_window.winfo_height() // 2)
+        theme_window.geometry(f"+{x}+{y}")
 
-        ctk.CTkLabel(scroll, text="Admin Management", font=get_font(18, True)).pack(anchor="w", pady=(0, 20))
+        container = ctk.CTkFrame(theme_window, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=16, pady=16)
 
-        # --- register new admin ---
-        ctk.CTkLabel(scroll, text="Register New Admin", font=get_font(14, True), text_color=ACCENT_COLOR).pack(anchor="w", pady=(0, 8))
+        settings_card = DepthCard(
+            container,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_MD,
+            border_width=BORDER_WIDTH_HAIRLINE,
+            border_color=BORDER_COLOR,
+        )
+        settings_card.pack(fill="both", expand=True)
 
-        def _make_entry(parent, placeholder):
-            e = ctk.CTkEntry(parent, placeholder_text=placeholder, height=CONTROL_HEIGHT_MD,
-                             fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
-                             border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
-            e.pack(fill="x", pady=(0, 8))
-            return e
+        frame = ctk.CTkFrame(settings_card, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=18, pady=18)
 
-        reg_user = _make_entry(scroll, "Username")
-        reg_pass = ctk.CTkEntry(scroll, placeholder_text="Password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
-                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
-        reg_pass.pack(fill="x", pady=(0, 8))
-        reg_conf = ctk.CTkEntry(scroll, placeholder_text="Confirm password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
-                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
-        reg_conf.pack(fill="x", pady=(0, 12))
+        title_label = ctk.CTkLabel(frame, text="Theme Management", font=get_font(22, True))
+        title_label.pack(anchor="w", pady=(0, 2))
 
-        def _register():
-            uname = reg_user.get().strip()
-            pwd   = reg_pass.get()
-            conf  = reg_conf.get()
-            if not all([uname, pwd, conf]):
-                self.controller.show_custom_dialog("Error", "Please fill all fields.", dialog_type="error")
-                return
-            if pwd != conf:
-                self.controller.show_custom_dialog("Error", "Passwords do not match.", dialog_type="error")
-                return
+        subtitle_label = ctk.CTkLabel(
+            frame,
+            text="Apply a quick visual style update across the app.",
+            font=get_font(12),
+            text_color=TEXT_MUTED,
+        )
+        subtitle_label.pack(anchor="w", pady=(0, 18))
 
-            from backend import validate_password
+        mode_label = ctk.CTkLabel(frame, text="Appearance Mode", font=get_font(14, True), text_color=TEXT_MUTED)
+        mode_label.pack(anchor="w", pady=(0, 6))
+        mode_combo = ctk.CTkOptionMenu(
+            frame,
+            values=["Dark", "Light"],
+            height=CONTROL_HEIGHT_MD,
+            font=FONT_MAIN,
+            fg_color=ACCENT_COLOR,
+            button_color=ACCENT_COLOR,
+            button_hover_color=BTN_PRIMARY_HOVER,
+            text_color=TEXT_PRIMARY,
+        )
+        mode_combo.pack(fill="x", pady=(0, 14))
 
-            ok, validation_msg = validate_password(pwd)
-            if not ok:
-                self.controller.show_custom_dialog("Error", validation_msg, dialog_type="error")
-                return
-            
-            success, msg = self.controller.create_user(uname, pwd)
-            if success:
-                for w in [reg_user, reg_pass, reg_conf]:
-                    w.delete(0, "end")
-                self.controller.show_custom_dialog("Success", msg)
-            else:
-                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+        current_mode, current_preset = get_theme_preference()
+        mode_combo.set(current_mode.title())
 
-        ctk.CTkButton(scroll, text="Register", height=CONTROL_HEIGHT_MD, font=get_font(13, True),
-                  fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER,
-                      command=_register).pack(fill="x", pady=(0, 20))
+        preset_label = ctk.CTkLabel(frame, text="Color Preset", font=get_font(14, True), text_color=TEXT_MUTED)
+        preset_label.pack(anchor="w", pady=(0, 8))
 
-        # divider
-        ctk.CTkFrame(scroll, height=2, fg_color=BORDER_COLOR).pack(fill="x", pady=(0, 20))
+        preset_row = ctk.CTkFrame(frame, fg_color="transparent")
+        preset_row.pack(fill="x", pady=(0, 12))
 
-        # --- change credentials ---
-        ctk.CTkLabel(scroll, text="Change Credentials", font=get_font(14, True), text_color=ACCENT_COLOR).pack(anchor="w", pady=(0, 8))
+        selected_preset = {"value": int(current_preset)}
+        preset_buttons = {}
 
-        chg_user = _make_entry(scroll, "Username to update")
-        chg_old  = ctk.CTkEntry(scroll, placeholder_text="Current password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
-                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
-        chg_old.pack(fill="x", pady=(0, 8))
-        chg_new  = ctk.CTkEntry(scroll, placeholder_text="New password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
-                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
-        chg_new.pack(fill="x", pady=(0, 8))
-        chg_conf = ctk.CTkEntry(scroll, placeholder_text="Confirm new password", show="*", height=CONTROL_HEIGHT_MD,
-                    fg_color=ENTRY_BG, border_width=BORDER_WIDTH_HAIRLINE,
-                    border_color=BORDER_COLOR, text_color=TEXT_PRIMARY)
-        chg_conf.pack(fill="x", pady=(0, 12))
+        def _refresh_preset_buttons():
+            for idx, btn in preset_buttons.items():
+                is_selected = idx == selected_preset["value"]
+                btn.configure(
+                    fg_color=THEME_PRESET_SWATCHES[idx],
+                    hover_color=THEME_PRESET_SWATCHES[idx],
+                    border_width=2 if is_selected else 1,
+                    border_color=ACCENT_COLOR if is_selected else BORDER_COLOR,
+                    text_color="white",
+                )
 
-        def _change_creds():
-            uname   = chg_user.get().strip()
-            old_pwd = chg_old.get()
-            new_pwd = chg_new.get()
-            conf    = chg_conf.get()
-            if not all([uname, old_pwd, new_pwd, conf]):
-                self.controller.show_custom_dialog("Error", "Please fill all fields.", dialog_type="error")
-                return
-            if new_pwd != conf:
-                self.controller.show_custom_dialog("Error", "New passwords do not match.", dialog_type="error")
-                return
+        def _select_preset(preset_idx: int):
+            selected_preset["value"] = int(preset_idx)
+            _refresh_preset_buttons()
 
-            from backend import validate_password
+        for idx, label in THEME_PRESET_LABELS.items():
+            btn = ctk.CTkButton(
+                preset_row,
+                text=label,
+                width=100,
+                height=42,
+                corner_radius=RADIUS_SM,
+                border_width=1,
+                border_color=BORDER_COLOR,
+                fg_color=THEME_PRESET_SWATCHES[idx],
+                hover_color=THEME_PRESET_SWATCHES[idx],
+                text_color="white",
+                command=lambda p=idx: _select_preset(p),
+            )
+            btn.pack(side="left", padx=(0, 8) if idx < 3 else (0, 0))
+            preset_buttons[idx] = btn
 
-            ok, validation_msg = validate_password(new_pwd)
-            if not ok:
-                self.controller.show_custom_dialog("Error", validation_msg, dialog_type="error")
-                return
-            
-            success, msg = self.controller.change_password(uname, old_pwd, new_pwd)
-            if success:
-                for w in [chg_user, chg_old, chg_new, chg_conf]:
-                    w.delete(0, "end")
-                self.controller.show_custom_dialog("Success", msg)
-            else:
-                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+        _refresh_preset_buttons()
 
-        ctk.CTkButton(scroll, text="Update Password", height=CONTROL_HEIGHT_MD, font=get_font(13, True),
-                  fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER,
-                      command=_change_creds).pack(fill="x", pady=(0, 8))
+        hint_label = ctk.CTkLabel(
+            frame,
+            text="Themes apply instantly and are saved for the next app launch.",
+            font=get_font(12),
+            text_color=TEXT_MUTED,
+            wraplength=440,
+            justify="left",
+        )
+        hint_label.pack(anchor="w", pady=(0, 16))
 
-        animate_toplevel_in(panel, x=x, y=y, duration_ms=get_motion_duration("dialog_open", 160))
+        action_row = ctk.CTkFrame(frame, fg_color="transparent")
+        action_row.pack(fill="x", pady=(4, 0))
+
+        def _apply_theme_selection():
+            self.apply_theme(mode_combo.get(), selected_preset["value"])
+
+        apply_btn = ctk.CTkButton(
+            action_row,
+            text="Apply Theme",
+            height=CONTROL_HEIGHT_MD,
+            fg_color=ACCENT_COLOR,
+            hover_color=BTN_PRIMARY_HOVER,
+            text_color=TEXT_PRIMARY,
+            command=_apply_theme_selection,
+        )
+        apply_btn.pack(side="left", fill="x", expand=True, padx=(0, 6))
+
+        close_btn = ctk.CTkButton(
+            action_row,
+            text="Close",
+            height=CONTROL_HEIGHT_MD,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
+            text_color=TEXT_PRIMARY,
+            command=_on_close,
+        )
+        close_btn.pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        self._theme_controls = {
+            "window": theme_window,
+            "card": settings_card,
+            "title_label": title_label,
+            "subtitle_label": subtitle_label,
+            "mode_label": mode_label,
+            "preset_label": preset_label,
+            "hint_label": hint_label,
+            "mode_combo": mode_combo,
+            "preset_buttons": preset_buttons,
+            "refresh_preset_buttons": _refresh_preset_buttons,
+            "apply_btn": apply_btn,
+            "close_btn": close_btn,
+        }
+
+        animate_toplevel_in(theme_window, x=x, y=y, duration_ms=get_motion_duration("dialog_open", 160))
 
     def open_settings(self):
-        """Open Settings window."""
-        settings_window = ctk.CTkToplevel(self)
-        settings_window.title("Settings")
-        apply_window_icon(settings_window)
-        settings_window.geometry("580x680")
-        settings_window.configure(fg_color=BG_COLOR)
-        settings_window.attributes('-topmost', True)
-        settings_window.grab_set()
-        settings_window.focus_force()
-        
-        settings_window.update_idletasks()
-        x = (settings_window.winfo_screenwidth() // 2) - (settings_window.winfo_width() // 2)
-        y = (settings_window.winfo_screenheight() // 2) - (settings_window.winfo_height() // 2)
-        settings_window.geometry(f"+{x}+{y}")
-        
-        container = ctk.CTkFrame(settings_window, fg_color="transparent")
-        container.pack(fill="both", expand=True, padx=16, pady=16)
-        
-        from frontend_ui.ui import DepthCard
-        settings_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=BORDER_WIDTH_HAIRLINE, border_color=BORDER_COLOR)
-        settings_card.pack(fill="both", expand=True)
-        frame = ctk.CTkScrollableFrame(settings_card, fg_color="transparent")
-        frame.pack(fill="both", expand=True, padx=16, pady=16)
-        
-        ctk.CTkLabel(frame, text="Settings", font=get_font(22, True)).pack(anchor="w", pady=(0, 25))
-        
-        # appearance
-        ctk.CTkLabel(frame, text="Appearance", font=get_font(15, True)).pack(anchor="w", pady=(15, 12))
-        ctk.CTkLabel(frame, text="Theme", font=FONT_BOLD).pack(anchor="w", pady=(5, 4))
-        theme_combo = ctk.CTkOptionMenu(frame, values=["Dark", "Light"], height=CONTROL_HEIGHT_MD, font=FONT_MAIN,
-                                       fg_color=ACCENT_COLOR, button_color=ACCENT_COLOR,
-                           button_hover_color=BTN_PRIMARY_HOVER, text_color=TEXT_PRIMARY)
-        theme_combo.pack(fill="x", pady=(0, 8))
-        # set current appearance
+        """Backward-compatible alias for opening theme management."""
+        self.open_theme_management()
+
+    def _show_theme_loading_flash(self):
+        """Show loading overlay while a theme refresh is in progress."""
+        existing = getattr(self, "_theme_flash", None)
+        if existing is not None and existing.winfo_exists():
+            try:
+                existing.destroy()
+            except Exception:
+                pass
+
+        flash = ctk.CTkToplevel(self)
+        flash.overrideredirect(True)
+        flash.attributes("-topmost", True)
+        flash.configure(fg_color=BG_COLOR)
+        self._theme_flash = flash
+
+        root = self.winfo_toplevel()
+        root.update_idletasks()
+        width, height = 300, 110
+        x = root.winfo_rootx() + (max(root.winfo_width(), width) - width) // 2
+        y = root.winfo_rooty() + (max(root.winfo_height(), height) - height) // 2
+        flash.geometry(f"{width}x{height}+{x}+{y}")
+
+        shell = DepthCard(
+            flash,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_MD,
+            border_width=BORDER_WIDTH_HAIRLINE,
+            border_color=BORDER_COLOR,
+        )
+        shell.pack(fill="both", expand=True, padx=6, pady=6)
+
+        ctk.CTkLabel(
+            shell,
+            text="Applying theme...",
+            font=get_font(13, True),
+            text_color=TEXT_PRIMARY,
+        ).pack(expand=True)
+
         try:
-            theme_combo.set(ctk.get_appearance_mode())
+            flash.attributes("-alpha", 0.0)
+        except Exception:
+            return flash
+
+        def _set_alpha(value: float):
+            if flash.winfo_exists():
+                try:
+                    flash.attributes("-alpha", max(0.0, min(1.0, float(value))))
+                except Exception:
+                    pass
+
+        def _fade(start: float, end: float, steps: int, duration_ms: int, on_done=None):
+            step_count = max(1, int(steps))
+            interval = max(10, int(duration_ms / step_count))
+
+            def _tick(i=0):
+                t = i / step_count
+                _set_alpha(start + ((end - start) * t))
+                if i < step_count and flash.winfo_exists():
+                    flash.after(interval, lambda: _tick(i + 1))
+                elif on_done:
+                    on_done()
+
+            _tick(0)
+
+        _fade(0.0, 0.95, steps=6, duration_ms=130)
+        return flash
+
+    def _hide_theme_loading_flash(self, flash=None):
+        """Fade out and close the active theme loading overlay."""
+        target = flash or self._theme_flash
+        if target is None or not target.winfo_exists():
+            if flash is None:
+                self._theme_flash = None
+            return
+
+        try:
+            target.attributes("-alpha", 0.95)
         except Exception:
             pass
-        # apply button to change theme immediately
-        def _apply_theme():
-            choice = theme_combo.get()
-            self.apply_theme(choice)
-        
-        ctk.CTkButton(frame, text="Apply Theme", height=CONTROL_HEIGHT_MD, command=_apply_theme,
-                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER).pack(fill="x", pady=(0, 10))
-        
-        # system
-        ctk.CTkLabel(frame, text="System", font=get_font(15, True)).pack(anchor="w", pady=(15, 12))
-        ctk.CTkCheckBox(frame, text="Enable Notifications", height=CONTROL_HEIGHT_SM, font=FONT_MAIN,
-                       fg_color=ACCENT_COLOR, checkmark_color=BG_COLOR).pack(anchor="w", pady=6)
-        ctk.CTkCheckBox(frame, text="Auto Backup on Exit", height=CONTROL_HEIGHT_SM, font=FONT_MAIN,
-                       fg_color=ACCENT_COLOR, checkmark_color=BG_COLOR).pack(anchor="w", pady=6)
-        ctk.CTkCheckBox(frame, text="Show Debug Info", height=CONTROL_HEIGHT_SM, font=FONT_MAIN,
-                       fg_color=ACCENT_COLOR, checkmark_color=BG_COLOR).pack(anchor="w", pady=6)
-        
-        # account
-        ctk.CTkLabel(frame, text="Account", font=get_font(15, True)).pack(anchor="w", pady=(15, 12))
-        ctk.CTkButton(frame, text="Change Password", height=CONTROL_HEIGHT_MD, font=FONT_MAIN,
-                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER).pack(fill="x", pady=6)
-        ctk.CTkButton(frame, text="Manage Admins", height=CONTROL_HEIGHT_MD, font=FONT_MAIN,
-                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER).pack(fill="x", pady=6)
-        
-        # data
-        ctk.CTkLabel(frame, text="Data Management", font=get_font(15, True)).pack(anchor="w", pady=(15, 12))
-        ctk.CTkButton(frame, text="Create Backup", height=CONTROL_HEIGHT_MD, font=FONT_MAIN,
-                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER,
-                     command=lambda: self.controller.show_custom_dialog("Success", "Backup created successfully!")).pack(fill="x", pady=6)
-        ctk.CTkButton(frame, text="View Backups", height=CONTROL_HEIGHT_MD, font=FONT_MAIN,
-                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER).pack(fill="x", pady=6)
-        ctk.CTkButton(frame, text="Export Data", height=CONTROL_HEIGHT_MD, font=FONT_MAIN,
-                 fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, hover_color=BTN_PRIMARY_HOVER).pack(fill="x", pady=6)
 
-        animate_toplevel_in(
-            settings_window,
-            x=x,
-            y=y,
-            duration_ms=get_motion_duration("dialog_open", 160),
-        )
+        def _set_alpha(value: float):
+            if target.winfo_exists():
+                try:
+                    target.attributes("-alpha", max(0.0, min(1.0, float(value))))
+                except Exception:
+                    pass
 
-    def apply_theme(self, choice: str):
-        """Apply appearance mode safely and notify all listeners."""
+        def _fade(start: float, end: float, steps: int, duration_ms: int, on_done=None):
+            step_count = max(1, int(steps))
+            interval = max(10, int(duration_ms / step_count))
+
+            def _tick(i=0):
+                t = i / step_count
+                _set_alpha(start + ((end - start) * t))
+                if i < step_count and target.winfo_exists():
+                    target.after(interval, lambda: _tick(i + 1))
+                elif on_done:
+                    on_done()
+
+            _tick(0)
+
+        def _finish():
+            if target.winfo_exists():
+                try:
+                    target.destroy()
+                except Exception:
+                    pass
+            if self._theme_flash is target:
+                self._theme_flash = None
+
+        _fade(0.95, 0.0, steps=7, duration_ms=145, on_done=_finish)
+
+    def _complete_theme_loading_after_refresh(self, flash, idle_passes: int = 2):
+        """Close loading overlay after queued UI refresh work has flushed."""
+        if flash is None or not flash.winfo_exists():
+            return
+
+        if idle_passes > 0:
+            self.after_idle(lambda: self._complete_theme_loading_after_refresh(flash, idle_passes - 1))
+            return
+
+        self._hide_theme_loading_flash(flash)
+
+    def apply_theme(self, choice: str, preset: int = 0):
+        """Apply and persist app theme, showing loading until refresh finishes."""
+        apply_btn = self._theme_controls.get("apply_btn")
         try:
             mode = choice.lower() if isinstance(choice, str) else str(choice).lower()
-            if mode not in ("dark", "light", "system"):
+            if mode not in ("dark", "light"):
                 mode = "dark"
-            
-            # set the appearance mode globally
-            ctk.set_appearance_mode(mode)
-            
-            # notify all listeners of the theme change
-            THEME_MANAGER.notify_theme_change(mode)
-            
+
+            if apply_btn is not None and apply_btn.winfo_exists():
+                apply_btn.configure(state="disabled", text="Applying...")
+
+            flash = self._show_theme_loading_flash()
+            apply_app_theme(mode, preset, persist=True, notify=True)
+
+            refresher = self._theme_controls.get("refresh_preset_buttons")
+            if callable(refresher):
+                refresher()
+
+            self.update_idletasks()
+            self._complete_theme_loading_after_refresh(flash, idle_passes=2)
         except Exception as e:
+            self._hide_theme_loading_flash()
             import traceback
             traceback.print_exc()
             try:
                 self.controller.show_custom_dialog("Theme Error", f"Could not apply theme '{choice}': {e}")
             except Exception:
                 pass
+        finally:
+            if apply_btn is not None and apply_btn.winfo_exists():
+                apply_btn.configure(state="normal", text="Apply Theme")
 
     def handle_login_click(self):
         """Handle login button click - transition to LoginFrame."""
@@ -1278,14 +1404,198 @@ class DashboardFrame(ctk.CTkFrame):
                                     command=self.handle_login_click)
             self.gear_btn.pack_forget()
 
-    def on_theme_change(self, mode: str):
-        """Callback when theme changes - refreshes all visible views."""
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to dashboard-level controls."""
+        tokens = tokens or {}
+        text_primary = tokens.get("TEXT_PRIMARY", TEXT_PRIMARY)
+
+        self.configure(fg_color=tokens.get("BG_COLOR", BG_COLOR))
+
+        if hasattr(self, "topbar_card") and self.topbar_card.winfo_exists():
+            self.topbar_card.configure(
+                fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR),
+                border_color=tokens.get("SHADOW_EDGE_COLOR", BORDER_COLOR),
+            )
+        if hasattr(self, "title_bar_card") and self.title_bar_card.winfo_exists():
+            self.title_bar_card.configure(
+                fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR),
+                border_color=tokens.get("SHADOW_EDGE_COLOR", BORDER_COLOR),
+            )
+        if hasattr(self, "nav_rail") and self.nav_rail.winfo_exists():
+            self.nav_rail.configure(fg_color=tokens.get("SURFACE_SECTION", SURFACE_SECTION))
+        if hasattr(self, "nexo_label") and self.nexo_label.winfo_exists():
+            self.nexo_label.configure(text_color=tokens.get("TITLE_COLOR", TITLE_COLOR))
+
+        self.search_entry.configure(
+            fg_color=tokens.get("ENTRY_BG", ENTRY_BG),
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            text_color=text_primary,
+        )
+        self.title_label.configure(text_color=tokens.get("TITLE_COLOR", TITLE_COLOR))
+
+        self.refresh_btn.configure(
+            fg_color=tokens.get("BTN_NEUTRAL_FG", BTN_NEUTRAL_FG),
+            hover_color=tokens.get("BTN_NEUTRAL_HOVER", BTN_NEUTRAL_HOVER),
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            text_color=text_primary,
+        )
+        self.gear_btn.configure(
+            fg_color=tokens.get("BTN_NEUTRAL_FG", BTN_NEUTRAL_FG),
+            hover_color=tokens.get("BTN_NEUTRAL_HOVER", BTN_NEUTRAL_HOVER),
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+        )
+        self.multi_edit_btn.configure(
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            text_color=text_primary,
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+        )
+        self.filter_btn.configure(
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            text_color=text_primary,
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+        )
+
+        if self.multi_edit_mode:
+            self.multi_edit_btn.configure(
+                fg_color=tokens.get("SUCCESS_COLOR", SUCCESS_COLOR),
+                hover_color=tokens.get("SUCCESS_HOVER", SUCCESS_HOVER),
+            )
+        else:
+            self.multi_edit_btn.configure(
+                fg_color=tokens.get("BTN_SECONDARY_FG", BTN_SECONDARY_FG),
+                hover_color=tokens.get("BTN_SECONDARY_HOVER", BTN_SECONDARY_HOVER),
+            )
+
+        if self.filter_panel_visible:
+            self.filter_btn.configure(
+                fg_color=tokens.get("SUCCESS_COLOR", SUCCESS_COLOR),
+                hover_color=tokens.get("SUCCESS_HOVER", SUCCESS_HOVER),
+            )
+        else:
+            self.filter_btn.configure(
+                fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+                hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            )
+
+        self.add_btn.configure(
+            border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            text_color=text_primary,
+        )
+
+        for btn in self.nav_btns.values():
+            btn.configure(
+                text_color=text_primary,
+                border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            )
+
+        self.update_button_states()
+        self.update_auth_button()
+
+        if self.filter_window and self.filter_window.winfo_exists():
+            self.filter_window.configure(fg_color=tokens.get("BG_COLOR", BG_COLOR))
+        if self.filter_card and self.filter_card.winfo_exists():
+            if hasattr(self.filter_card, "apply_theme_colors"):
+                self.filter_card.apply_theme_colors(tokens)
+            else:
+                self.filter_card.configure(fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR))
+        if self.filter_title_label and self.filter_title_label.winfo_exists():
+            self.filter_title_label.configure(text_color=tokens.get("TEXT_MUTED", TEXT_MUTED))
+        if self.filter_summary_label and self.filter_summary_label.winfo_exists():
+            self.filter_summary_label.configure(text_color=tokens.get("TEXT_MUTED", TEXT_MUTED))
+        if self.apply_filters_btn and self.apply_filters_btn.winfo_exists():
+            self.apply_filters_btn.configure(
+                fg_color=tokens.get("BTN_PRIMARY_FG", BTN_PRIMARY_FG),
+                hover_color=tokens.get("BTN_PRIMARY_HOVER", BTN_PRIMARY_HOVER),
+                text_color=text_primary,
+                border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            )
+        if self.reset_filters_btn and self.reset_filters_btn.winfo_exists():
+            self.reset_filters_btn.configure(
+                fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+                hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+                text_color=text_primary,
+                border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            )
+        if self.hide_filters_btn and self.hide_filters_btn.winfo_exists():
+            self.hide_filters_btn.configure(
+                fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+                hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+                text_color=text_primary,
+                border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+            )
+
+        theme_window = self._theme_controls.get("window")
+        if theme_window is not None and theme_window.winfo_exists():
+            theme_window.configure(fg_color=tokens.get("BG_COLOR", BG_COLOR))
+
+            theme_card = self._theme_controls.get("card")
+            if theme_card is not None and theme_card.winfo_exists():
+                if hasattr(theme_card, "apply_theme_colors"):
+                    theme_card.apply_theme_colors(tokens)
+                else:
+                    theme_card.configure(fg_color=tokens.get("PANEL_COLOR", PANEL_COLOR))
+
+            for label_key in ("title_label", "subtitle_label", "mode_label", "preset_label", "hint_label"):
+                label_widget = self._theme_controls.get(label_key)
+                if label_widget is None or not label_widget.winfo_exists():
+                    continue
+                if label_key == "title_label":
+                    label_widget.configure(text_color=tokens.get("TITLE_COLOR", TITLE_COLOR))
+                elif label_key in ("mode_label", "preset_label", "subtitle_label", "hint_label"):
+                    label_widget.configure(text_color=tokens.get("TEXT_MUTED", TEXT_MUTED))
+
+            mode_combo = self._theme_controls.get("mode_combo")
+            if mode_combo is not None and mode_combo.winfo_exists():
+                mode_combo.configure(
+                    fg_color=tokens.get("ACCENT_COLOR", ACCENT_COLOR),
+                    button_color=tokens.get("ACCENT_COLOR", ACCENT_COLOR),
+                    button_hover_color=tokens.get("BTN_PRIMARY_HOVER", BTN_PRIMARY_HOVER),
+                    text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+                )
+
+            apply_btn = self._theme_controls.get("apply_btn")
+            if apply_btn is not None and apply_btn.winfo_exists():
+                apply_btn.configure(
+                    fg_color=tokens.get("ACCENT_COLOR", ACCENT_COLOR),
+                    hover_color=tokens.get("BTN_PRIMARY_HOVER", BTN_PRIMARY_HOVER),
+                    text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+                    border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+                )
+
+            close_btn = self._theme_controls.get("close_btn")
+            if close_btn is not None and close_btn.winfo_exists():
+                close_btn.configure(
+                    fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+                    hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+                    text_color=tokens.get("TEXT_PRIMARY", TEXT_PRIMARY),
+                    border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+                )
+
+            refresh_presets = self._theme_controls.get("refresh_preset_buttons")
+            if callable(refresh_presets):
+                refresh_presets()
+
+    def on_theme_change(self, mode: str, preset: int = 0, tokens: dict | None = None):
+        """Callback when theme changes - recolor dashboard and child views."""
         try:
-            # update current view if it exists
-            if self.current_view and self.current_view in self.views:
-                view = self.views[self.current_view]
-                # force re-render of the view
-                if hasattr(view, 'refresh_table'):
+            resolved_tokens = tokens or THEME_MANAGER.get_current_tokens()
+            self.apply_theme_colors(resolved_tokens)
+
+            for view in self.views.values():
+                if hasattr(view, "apply_theme_colors"):
+                    view.apply_theme_colors(resolved_tokens)
+                elif hasattr(view, "refresh_table"):
                     view.refresh_table()
         except Exception as e:
             print(f"Error refreshing view on theme change: {e}")
+
+    def _on_destroy(self, event):
+        if event.widget is self:
+            if self._theme_flash is not None and self._theme_flash.winfo_exists():
+                try:
+                    self._theme_flash.destroy()
+                except Exception:
+                    pass
+            self._theme_flash = None
+            self._theme_controls = {}
+            THEME_MANAGER.unregister_listener(self.on_theme_change)

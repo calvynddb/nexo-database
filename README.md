@@ -29,7 +29,9 @@ The app is fully SQLite-backed through SQLAlchemy.
 
 Key features:
 
-- Authentication with salted SHA-256 password hashes
+- Streamlined access flow with a single Proceed as Administrator entry action
+- Theme management with Light/Dark mode plus 4 accent presets (Purple, Blue, Orange, Pink)
+- Theme preference persistence across app restarts
 - CRUDL for Students, Programs, Colleges
 - Search, sort, and pagination in each table view
 - Dashboard analytics and enrollment visuals

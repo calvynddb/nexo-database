@@ -180,13 +180,14 @@ class CollegesView(ctk.CTkFrame):
 
         right_panel = ctk.CTkFrame(self, width=320, fg_color="transparent")
         right_panel.grid(row=1, column=1, sticky="nsew")
+        self.right_panel = right_panel
         
         ctk.CTkLabel(right_panel, text="DIRECTORY FACTS", font=get_font(12, True), text_color=TEXT_MUTED).pack(anchor="w", pady=(0, SPACE_SM))
 
         # use icons like Students view and keep references to avoid GC
         self._fact_img_students = get_icon("users", size=28, fallback_color=ACCENT_COLOR)
-        self._fact_img_programs = get_icon("books", size=28, fallback_color="#8b5cf6")
-        self._fact_img_colleges = get_icon("building", size=28, fallback_color="#7c5fb2")
+        self._fact_img_programs = get_icon("books", size=28, fallback_color=COLOR_PALETTE[1 % len(COLOR_PALETTE)])
+        self._fact_img_colleges = get_icon("building", size=28, fallback_color=COLOR_PALETTE[2 % len(COLOR_PALETTE)])
 
         total_students = str(len(self.controller.students))
         total_programs = str(len(self.controller.programs))
@@ -245,6 +246,66 @@ class CollegesView(ctk.CTkFrame):
         self._render_page()
         self._last_hover = None
 
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to the currently mounted colleges view."""
+        tokens = tokens or {}
+        panel = tokens.get("PANEL_COLOR", PANEL_COLOR)
+        text_primary = tokens.get("TEXT_PRIMARY", TEXT_PRIMARY)
+        text_muted = tokens.get("TEXT_MUTED", TEXT_MUTED)
+        border = tokens.get("BORDER_COLOR", BORDER_COLOR)
+
+        if hasattr(self.table_container, "apply_theme_colors"):
+            self.table_container.apply_theme_colors(tokens)
+        else:
+            self.table_container.configure(fg_color=panel, border_color=border)
+
+        if hasattr(self.footer, "apply_theme_colors"):
+            self.footer.apply_theme_colors(tokens)
+        else:
+            self.footer.configure(fg_color=panel, border_color=border)
+
+        self.entry_count_label.configure(text_color=text_muted)
+
+        self.csv_import_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.csv_export_btn.configure(
+            fg_color=tokens.get("ACCENT_COLOR", ACCENT_COLOR),
+            hover_color=tokens.get("BTN_PRIMARY_HOVER", BTN_PRIMARY_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.bulk_edit_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.bulk_delete_btn.configure(
+            fg_color=tokens.get("DANGER_COLOR", DANGER_COLOR),
+            hover_color=tokens.get("DANGER_HOVER", DANGER_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+
+        if hasattr(self, "pagination") and hasattr(self.pagination, "apply_theme_colors"):
+            self.pagination.apply_theme_colors(tokens)
+
+        setup_treeview_style()
+        self.tree.tag_configure("odd", background=tokens.get("TABLE_ODD_BG", TABLE_ODD_BG))
+        self.tree.tag_configure("even", background=tokens.get("TABLE_EVEN_BG", TABLE_EVEN_BG))
+        self.tree.tag_configure(
+            "hover",
+            background=tokens.get("TABLE_HOVER_BG", TABLE_HOVER_BG),
+            foreground=tokens.get("TEXT_PRIMARY", "#ffffff"),
+        )
+
+        self.refresh_sidebar()
+        self.refresh_table()
+
     def _animate_page_flip(self):
         if self._page_anim_after_id:
             try:
@@ -254,7 +315,7 @@ class CollegesView(ctk.CTkFrame):
             self._page_anim_after_id = None
 
         try:
-            self.table_container.configure(fg_color="#1a1329")
+            self.table_container.configure(fg_color=TABLE_HOVER_BG)
         except Exception:
             return
 
@@ -383,8 +444,8 @@ class CollegesView(ctk.CTkFrame):
         ctk.CTkLabel(self.right_panel, text="DIRECTORY FACTS", font=get_font(12, True), text_color=TEXT_MUTED).pack(anchor="w", pady=(0, SPACE_SM))
 
         self._fact_img_students = get_icon("users", size=28, fallback_color=ACCENT_COLOR)
-        self._fact_img_programs = get_icon("books", size=28, fallback_color="#8b5cf6")
-        self._fact_img_colleges = get_icon("building", size=28, fallback_color="#7c5fb2")
+        self._fact_img_programs = get_icon("books", size=28, fallback_color=COLOR_PALETTE[1 % len(COLOR_PALETTE)])
+        self._fact_img_colleges = get_icon("building", size=28, fallback_color=COLOR_PALETTE[2 % len(COLOR_PALETTE)])
 
         total_students = str(len(self.controller.students))
         total_programs = str(len(self.controller.programs))
@@ -823,7 +884,12 @@ class CollegesView(ctk.CTkFrame):
         self.tree.selection_set(item)
         menu = tk.Menu(self, tearoff=0)
         try:
-            menu.configure(bg=PANEL_COLOR, fg=TEXT_PRIMARY, activebackground="#3a2f45", activeforeground=TEXT_PRIMARY)
+            menu.configure(
+                bg=PANEL_COLOR,
+                fg=TEXT_PRIMARY,
+                activebackground=TABLE_HOVER_BG,
+                activeforeground=TEXT_PRIMARY,
+            )
         except Exception:
             pass
         menu.add_command(label="Edit", command=lambda: self.on_row_select(None))

@@ -224,6 +224,77 @@ class StudentsView(ctk.CTkFrame):
         self._last_hover = None
         self._last_hover = None
 
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to the currently mounted students view."""
+        tokens = tokens or {}
+        panel = tokens.get("PANEL_COLOR", PANEL_COLOR)
+        text_primary = tokens.get("TEXT_PRIMARY", TEXT_PRIMARY)
+        text_muted = tokens.get("TEXT_MUTED", TEXT_MUTED)
+        border = tokens.get("BORDER_COLOR", BORDER_COLOR)
+
+        if hasattr(self.table_container, "apply_theme_colors"):
+            self.table_container.apply_theme_colors(tokens)
+        else:
+            self.table_container.configure(fg_color=panel, border_color=border)
+
+        if hasattr(self.footer, "apply_theme_colors"):
+            self.footer.apply_theme_colors(tokens)
+        else:
+            self.footer.configure(fg_color=panel, border_color=border)
+
+        self.entry_count_label.configure(text_color=text_muted)
+
+        self.csv_import_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.csv_export_btn.configure(
+            fg_color=tokens.get("ACCENT_COLOR", ACCENT_COLOR),
+            hover_color=tokens.get("BTN_PRIMARY_HOVER", BTN_PRIMARY_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.bulk_edit_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.bulk_delete_btn.configure(
+            fg_color=tokens.get("DANGER_COLOR", DANGER_COLOR),
+            hover_color=tokens.get("DANGER_HOVER", DANGER_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+
+        if hasattr(self, "pagination") and hasattr(self.pagination, "apply_theme_colors"):
+            self.pagination.apply_theme_colors(tokens)
+
+        setup_treeview_style()
+        self.tree.tag_configure("odd", background=tokens.get("TABLE_ODD_BG", TABLE_ODD_BG))
+        self.tree.tag_configure("even", background=tokens.get("TABLE_EVEN_BG", TABLE_EVEN_BG))
+        self.tree.tag_configure(
+            "hover",
+            background=tokens.get("TABLE_HOVER_BG", TABLE_HOVER_BG),
+            foreground=tokens.get("TEXT_PRIMARY", "#ffffff"),
+        )
+        self.tree.tag_configure(
+            "action_button",
+            foreground=tokens.get("ACCENT_COLOR", ACCENT_COLOR),
+            font=get_font(12, True),
+            background=tokens.get("PANEL_COLOR", PANEL_COLOR),
+        )
+        self.tree.tag_configure(
+            "action_button_delete",
+            foreground=tokens.get("DANGER_COLOR", DANGER_COLOR),
+            font=get_font(12, True),
+            background=tokens.get("PANEL_COLOR", PANEL_COLOR),
+        )
+
+        self.refresh_table()
+
     def _animate_page_flip(self):
         if self._page_anim_after_id:
             try:
@@ -233,7 +304,7 @@ class StudentsView(ctk.CTkFrame):
             self._page_anim_after_id = None
 
         try:
-            self.table_container.configure(fg_color="#1a1329")
+            self.table_container.configure(fg_color=TABLE_HOVER_BG)
         except Exception:
             return
 

@@ -213,7 +213,7 @@ class ProgramsView(ctk.CTkFrame):
             enrollments[prog] = enrollments.get(prog, 0) + 1
         
         sorted_progs = sorted(enrollments.items(), key=lambda x: x[1], reverse=True)[:3]
-        colors_list = [ACCENT_COLOR, "#a78bfa", "#6366f1"]
+        colors_list = [COLOR_PALETTE[i % len(COLOR_PALETTE)] for i in range(3)]
         
         for i, (p, val) in enumerate(sorted_progs):
             f = ctk.CTkFrame(top_card, fg_color="transparent")
@@ -262,16 +262,6 @@ class ProgramsView(ctk.CTkFrame):
         chart_body.pack(fill="both", expand=True, padx=SPACE_SM, pady=(SPACE_XS, SPACE_MD))
         parent._chart_body = chart_body
 
-        color_map = {
-            "CCS": "#87CEEB",
-            "COE": "#800000",
-            "CSM": "#ff0000",
-            "CED": "#00008b",
-            "CASS": "#008000",
-            "CEBA": "#ffd700",
-            "CHS": "#d1d5db",
-        }
-
         college_counts = {}
         for program in self.controller.programs:
             college_code = str(program.get("college", "Unknown") or "Unknown").strip().upper()
@@ -285,7 +275,7 @@ class ProgramsView(ctk.CTkFrame):
 
         labels = [code for code, _ in ranked]
         values = [count for _, count in ranked]
-        colors = [color_map.get(code, COLOR_PALETTE[i % len(COLOR_PALETTE)]) for i, code in enumerate(labels)]
+        colors = [COLOR_PALETTE[i % len(COLOR_PALETTE)] for i, _code in enumerate(labels)]
 
         try:
             from matplotlib.figure import Figure
@@ -345,6 +335,66 @@ class ProgramsView(ctk.CTkFrame):
         self._render_page()
         self._last_hover = None
 
+    def apply_theme_colors(self, tokens: dict):
+        """Apply resolved theme tokens to the currently mounted programs view."""
+        tokens = tokens or {}
+        panel = tokens.get("PANEL_COLOR", PANEL_COLOR)
+        text_primary = tokens.get("TEXT_PRIMARY", TEXT_PRIMARY)
+        text_muted = tokens.get("TEXT_MUTED", TEXT_MUTED)
+        border = tokens.get("BORDER_COLOR", BORDER_COLOR)
+
+        if hasattr(self.table_container, "apply_theme_colors"):
+            self.table_container.apply_theme_colors(tokens)
+        else:
+            self.table_container.configure(fg_color=panel, border_color=border)
+
+        if hasattr(self.footer, "apply_theme_colors"):
+            self.footer.apply_theme_colors(tokens)
+        else:
+            self.footer.configure(fg_color=panel, border_color=border)
+
+        self.entry_count_label.configure(text_color=text_muted)
+
+        self.csv_import_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.csv_export_btn.configure(
+            fg_color=tokens.get("ACCENT_COLOR", ACCENT_COLOR),
+            hover_color=tokens.get("BTN_PRIMARY_HOVER", BTN_PRIMARY_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.bulk_edit_btn.configure(
+            fg_color=tokens.get("BTN_SEGMENT_FG", BTN_SEGMENT_FG),
+            hover_color=tokens.get("BTN_SEGMENT_HOVER", BTN_SEGMENT_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+        self.bulk_delete_btn.configure(
+            fg_color=tokens.get("DANGER_COLOR", DANGER_COLOR),
+            hover_color=tokens.get("DANGER_HOVER", DANGER_HOVER),
+            border_color=border,
+            text_color=text_primary,
+        )
+
+        if hasattr(self, "pagination") and hasattr(self.pagination, "apply_theme_colors"):
+            self.pagination.apply_theme_colors(tokens)
+
+        setup_treeview_style()
+        self.tree.tag_configure("odd", background=tokens.get("TABLE_ODD_BG", TABLE_ODD_BG))
+        self.tree.tag_configure("even", background=tokens.get("TABLE_EVEN_BG", TABLE_EVEN_BG))
+        self.tree.tag_configure(
+            "hover",
+            background=tokens.get("TABLE_HOVER_BG", TABLE_HOVER_BG),
+            foreground=tokens.get("TEXT_PRIMARY", "#ffffff"),
+        )
+
+        self.refresh_sidebar()
+        self.refresh_table()
+
     def _animate_page_flip(self):
         if self._page_anim_after_id:
             try:
@@ -354,7 +404,7 @@ class ProgramsView(ctk.CTkFrame):
             self._page_anim_after_id = None
 
         try:
-            self.table_container.configure(fg_color="#1a1329")
+            self.table_container.configure(fg_color=TABLE_HOVER_BG)
         except Exception:
             return
 
@@ -469,7 +519,7 @@ class ProgramsView(ctk.CTkFrame):
             prog = student.get('program', 'Unknown')
             enrollments[prog] = enrollments.get(prog, 0) + 1
         sorted_progs = sorted(enrollments.items(), key=lambda x: x[1], reverse=True)[:3]
-        colors_list = [ACCENT_COLOR, "#a78bfa", "#6366f1"]
+        colors_list = [COLOR_PALETTE[i % len(COLOR_PALETTE)] for i in range(3)]
         for i, (p, val) in enumerate(sorted_progs):
             f = ctk.CTkFrame(top_card, fg_color="transparent")
             f.pack(fill="x", padx=SPACE_LG, pady=SPACE_XS)
@@ -880,7 +930,12 @@ class ProgramsView(ctk.CTkFrame):
         self.tree.selection_set(item)
         menu = tk.Menu(self, tearoff=0)
         try:
-            menu.configure(bg=PANEL_COLOR, fg=TEXT_PRIMARY, activebackground="#3a2f45", activeforeground=TEXT_PRIMARY)
+            menu.configure(
+                bg=PANEL_COLOR,
+                fg=TEXT_PRIMARY,
+                activebackground=TABLE_HOVER_BG,
+                activeforeground=TEXT_PRIMARY,
+            )
         except Exception:
             pass
         menu.add_command(label="Edit", command=lambda: self.on_row_select(None))

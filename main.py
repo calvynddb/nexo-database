@@ -15,7 +15,7 @@ if getattr(sys, 'frozen', False):
     os.environ.setdefault('MPLBACKEND', 'TkAgg')
 
 import customtkinter as ctk
-from config import WINDOW_WIDTH, WINDOW_HEIGHT
+from config import WINDOW_WIDTH, WINDOW_HEIGHT, apply_theme, load_theme_preference
 from backend import get_session, hash_password, init_files, verify_password
 from backend.models import College, Program, Student, User
 from backend.validators import validate_password
@@ -31,6 +31,9 @@ class App(ctk.CTk):
     """Main application window."""
 
     def __init__(self):
+        saved_mode, saved_preset = load_theme_preference()
+        apply_theme(saved_mode, saved_preset, persist=False, notify=False)
+
         if sys.platform.startswith("win"):
             try:
                 import ctypes

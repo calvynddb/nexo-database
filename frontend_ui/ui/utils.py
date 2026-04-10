@@ -47,6 +47,11 @@ _UI_TIMING_ENABLED = str(os.getenv("NEXO_UI_TIMING", "")).strip().lower() in {
 }
 
 
+def clear_icon_cache():
+    """Clear in-memory icon cache so recolored fallbacks can reload."""
+    _icon_cache.clear()
+
+
 def log_ui_timing(label: str, started_at: float, warn_ms: int = 90) -> float:
     """Log UI timings only when slow (or when timing mode is explicitly enabled)."""
     elapsed_ms = (time.perf_counter() - started_at) * 1000.0
@@ -414,7 +419,11 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
         accent = "#c41e3a"
         icon_text = "ERROR"
     elif dialog_type == "warning":
-        accent = "#d4a017"
+        try:
+            mode = str(ctk.get_appearance_mode() or "").lower()
+        except Exception:
+            mode = "dark"
+        accent = ACCENT_COLOR if mode == "dark" else "#b7791f"
         icon_text = "WARNING"
     elif dialog_type == "yesno":
         accent = ACCENT_COLOR
@@ -471,7 +480,7 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
     return result[0]
 
 
-def get_icon(name: str, size: int = 36, fallback_color: str = "#6d28d9"):
+def get_icon(name: str, size: int = 36, fallback_color: str | None = None):
     """Load an icon from assets/icons directory, with fallback to colored square.
     
     Args:
@@ -482,6 +491,9 @@ def get_icon(name: str, size: int = 36, fallback_color: str = "#6d28d9"):
     Returns:
         CTkImage or PhotoImage suitable for CustomTkinter widgets
     """
+    if fallback_color is None:
+        fallback_color = ACCENT_COLOR
+
     cache_key = f"{name}_{size}"
     
     # return from cache if available
