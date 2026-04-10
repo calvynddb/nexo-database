@@ -200,7 +200,15 @@ class ProgramsView(ctk.CTkFrame):
 
         table_container.bind('<Configure>', _on_table_config)
 
-        right_panel = ctk.CTkFrame(self, width=320, fg_color="transparent")
+        right_panel = ctk.CTkScrollableFrame(
+            self,
+            width=320,
+            fg_color="transparent",
+            corner_radius=0,
+            border_width=0,
+            scrollbar_button_color=BTN_SEGMENT_FG,
+            scrollbar_button_hover_color=BTN_SEGMENT_HOVER,
+        )
         right_panel.grid(row=1, column=1, sticky="nsew")
         self.right_panel = right_panel
 
@@ -241,11 +249,13 @@ class ProgramsView(ctk.CTkFrame):
         self.refresh_table()
 
     def _get_year_level_counts(self):
+        """Count students across all four displayed year levels (1 to 4)."""
         year_counts = {"1": 0, "2": 0, "3": 0, "4": 0}
         for student in self.controller.students:
-            year_value = str(student.get("year", "")).strip()
-            if year_value and year_value[0] in year_counts:
-                year_counts[year_value[0]] += 1
+            year_raw = str(student.get("year", "")).strip()
+            first_digit = next((ch for ch in year_raw if ch.isdigit()), "")
+            if first_digit in year_counts:
+                year_counts[first_digit] += 1
         return year_counts
 
     @staticmethod
@@ -267,7 +277,7 @@ class ProgramsView(ctk.CTkFrame):
             corner_radius=RADIUS_LG,
             border_width=0,
             border_color=BORDER_COLOR,
-            height=282,
+            height=324,
         )
         self.fun_fact_card.pack(fill="x", pady=(SPACE_SM, 0))
         self.fun_fact_card.pack_propagate(False)
@@ -300,10 +310,10 @@ class ProgramsView(ctk.CTkFrame):
             bar.set(count / max_count)
 
     def _draw_canvas_donut(self, chart_body, values, colors, total_programs):
-        canvas = tk.Canvas(chart_body, bg=PANEL_COLOR, highlightthickness=0, bd=0, height=230)
-        canvas.pack(fill="x", pady=(0, SPACE_SM))
+        canvas = tk.Canvas(chart_body, bg=PANEL_COLOR, highlightthickness=0, bd=0, width=292, height=230)
+        canvas.pack(pady=(0, SPACE_SM))
 
-        cx, cy = 145, 112
+        cx, cy = int(canvas.cget("width")) // 2, int(canvas.cget("height")) // 2
         outer_r = 82
         inner_r = 48
         start = 90.0
