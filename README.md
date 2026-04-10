@@ -5,12 +5,12 @@
 <h1 align="center">nexo</h1>
 
 <p align="center">
-  <b>Version 2.0.0</b><br/>
+  <b>Version 2.0.1</b><br/>
   Desktop Student Information System built with Python, CustomTkinter, and SQLite
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-2563eb" alt="Version 2.0.0"/>
+  <img src="https://img.shields.io/badge/version-2.0.1-2563eb" alt="Version 2.0.1"/>
   <img src="https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white" alt="Python 3.13"/>
   <img src="https://img.shields.io/badge/UI-CustomTkinter-4f46e5" alt="CustomTkinter"/>
   <img src="https://img.shields.io/badge/database-SQLite%20%2B%20SQLAlchemy-16a34a" alt="SQLite and SQLAlchemy"/>
@@ -27,7 +27,7 @@
 
 nexo is a desktop SIS with CRUDL workflows for Students, Programs, and Colleges.
 
-Highlights in 2.0.0:
+Highlights in 2.0.1:
 
 - Simplified admin entry flow with Proceed as Administrator
 - Theme system with Light or Dark mode plus 4 color presets (Purple, Blue, Orange, Pink)
@@ -108,7 +108,7 @@ nexo-database/
 |- build_exe.bat
 |- nexo.spec
 |- nexo.db
-|- setup_admin.py
+
 |- assets/
 |  |- icons/
 |  |- screenshots/
