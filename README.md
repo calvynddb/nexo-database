@@ -5,14 +5,15 @@
 <h1 align="center">nexo</h1>
 
 <p align="center">
-  <b>A Simple Student Information System</b><br/>
-  Built with Python, CustomTkinter, and SQLite
+  <b>Version 2.0.0</b><br/>
+  Desktop Student Information System built with Python, CustomTkinter, and SQLite
 </p>
 
 <p align="center">
+  <img src="https://img.shields.io/badge/version-2.0.0-2563eb" alt="Version 2.0.0"/>
   <img src="https://img.shields.io/badge/python-3.13-blue?logo=python&logoColor=white" alt="Python 3.13"/>
   <img src="https://img.shields.io/badge/UI-CustomTkinter-4f46e5" alt="CustomTkinter"/>
-  <img src="https://img.shields.io/badge/database-SQLite-16a34a" alt="SQLite"/>
+  <img src="https://img.shields.io/badge/database-SQLite%20%2B%20SQLAlchemy-16a34a" alt="SQLite and SQLAlchemy"/>
   <img src="https://img.shields.io/badge/license-MIT-yellow" alt="MIT License"/>
 </p>
 
@@ -24,18 +25,17 @@
 
 ## Overview
 
-Nexo is a desktop student information system with full CRUDL operations for Students, Programs, and Colleges.
-The app is fully SQLite-backed through SQLAlchemy.
+nexo is a desktop SIS with CRUDL workflows for Students, Programs, and Colleges.
 
-Key features:
+Highlights in 2.0.0:
 
-- Streamlined access flow with a single Proceed as Administrator entry action (no saved login credentials required)
-- Theme management with Light/Dark mode plus 4 accent presets (Purple, Blue, Orange, Pink)
-- Theme preference persistence across app restarts
-- CRUDL for Students, Programs, Colleges
-- Search, sort, and pagination in each table view
-- Dashboard analytics and enrollment visuals
-- Packaged desktop executable via PyInstaller
+- Simplified admin entry flow with Proceed as Administrator
+- Theme system with Light or Dark mode plus 4 color presets (Purple, Blue, Orange, Pink)
+- Theme-aware branding assets and refreshed dashboard/login visuals
+- Search, sort, bulk actions, and pagination in list views
+- Sidebar analytics including college distribution and year-level rankings
+- SQLite persistence via SQLAlchemy
+- PyInstaller one-file Windows build pipeline
 
 ---
 
@@ -46,24 +46,20 @@ Key features:
 | Language | Python 3.13+ |
 | UI Framework | CustomTkinter |
 | Database | SQLite + SQLAlchemy |
-| Charts | Matplotlib + NumPy |
+| Charts | Matplotlib + NumPy (with Tk canvas fallback in packaged mode) |
 | Packaging | PyInstaller |
 
 ---
 
-## Getting Started
+## Setup (Development)
 
 ### Prerequisites
 
 - Python 3.13+
-- Dependencies from requirements.txt
 
-### Installation
+### Install
 
 ```bash
-git clone https://github.com/calvynddb/Simple-Student-Information-System.git
-cd Simple-Student-Information-System
-
 python -m venv .venv
 .venv\Scripts\activate
 pip install -r requirements.txt
@@ -75,46 +71,49 @@ pip install -r requirements.txt
 python main.py
 ```
 
-On first launch, the app initializes the SQLite schema in nexo.db if needed.
+The app uses `nexo.db` in the project root for local development.
+
+---
+
+## Build Executable (Windows)
+
+```bat
+build_exe.bat
+```
+
+What `build_exe.bat` does:
+
+- Uses Python 3.13 build interpreter
+- Installs/updates dependencies from `requirements.txt`
+- Builds `dist\nexo.exe` with PyInstaller
+- Bundles runtime assets, UI modules, backend modules, and SQLAlchemy dependencies
+- Bundles current `nexo.db`
+
+### Data Seeding Behavior in EXE
+
+On first run in a new folder:
+
+- If `nexo.db` does not exist beside `nexo.exe`, the app copies bundled `nexo.db` into place
+- This preserves the seeded dataset shipped at build time (including large student sets)
 
 ---
 
 ## Project Structure
 
 ```text
-nexo/
+nexo-database/
 |- main.py
 |- config.py
 |- requirements.txt
 |- build_exe.bat
 |- nexo.spec
 |- nexo.db
+|- setup_admin.py
+|- assets/
+|  |- icons/
+|  |- screenshots/
 |- backend/
 |  |- __init__.py
-|  |- students/
-|  |  |- controller.py
-|  |  |- service.py
-|  |  |- repository.py
-|  |  |- validators.py
-|  |  |- queries.py
-|  |  |- sorts.py
-|  |- programs/
-|  |  |- controller.py
-|  |  |- service.py
-|  |  |- repository.py
-|  |  |- validators.py
-|  |  |- queries.py
-|  |  |- sorts.py
-|  |- colleges/
-|  |  |- controller.py
-|  |  |- service.py
-|  |  |- repository.py
-|  |  |- validators.py
-|  |  |- queries.py
-|  |  |- sorts.py
-|  |- controllers/      (compatibility wrappers)
-|  |- services/         (compatibility wrappers + shared services)
-|  |- repositories/     (compatibility wrappers)
 |  |- auth.py
 |  |- database.py
 |  |- models.py
@@ -123,56 +122,15 @@ nexo/
 |  |- search/
 |  |- sort/
 |- frontend_ui/
-|  |- students/
-|  |  |- list_view.py
-|  |- programs/
-|  |  |- list_view.py
-|  |- colleges/
-|  |  |- list_view.py
 |  |- auth/
 |  |- dashboard/
-|  |- views/            (compatibility wrappers)
 |  |- ui/
-|- assets/
+|  |- views/
 ```
-
-### CRUDL Navigation Guide
-
-Use the feature packages first when navigating code:
-
-- Student CRUDL:
-  - backend/students/controller.py
-  - backend/students/service.py
-  - backend/students/repository.py
-- Program CRUDL:
-  - backend/programs/controller.py
-  - backend/programs/service.py
-  - backend/programs/repository.py
-- College CRUDL:
-  - backend/colleges/controller.py
-  - backend/colleges/service.py
-  - backend/colleges/repository.py
-
-Frontend list views are feature-oriented as well (canonical implementation paths):
-
-- frontend_ui/students/list_view.py
-- frontend_ui/programs/list_view.py
-- frontend_ui/colleges/list_view.py
-
-Legacy layer-first folders are still present as compatibility wrappers during migration.
 
 ---
 
-## Build Executable
+## Notes
 
-```bash
-./build_exe.bat
-```
-
-Or use the spec directly:
-
-```bash
-pyinstaller nexo.spec
-```
-
-The packaged app uses SQLite persistence.
+- This project currently uses an admin entry action instead of persisted login credentials.
+- Theme preferences are stored in `theme_prefs.json`.
