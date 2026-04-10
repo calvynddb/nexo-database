@@ -6,6 +6,7 @@ import re
 
 
 _NAME_PATTERN = re.compile(r"^[A-Za-z][A-Za-z' -]*$")
+_STUDENT_ID_PATTERN = re.compile(r"^\d{4}-\d{4}$")
 
 
 def _norm(value) -> str:
@@ -43,9 +44,9 @@ def validate_student(record, require_program: bool = True):
         if not value:
             return False, f"Missing field: {field}"
 
-    # id must match format 202x-xxxx (e.g. 2024-0001)
-    if not re.match(r'^202\d-\d{4}$', sid):
-        return False, "Student ID must follow the format 202X-XXXX (e.g. 2024-0001)"
+    # id must match format YYYY-NNNN (e.g. 2024-0001)
+    if not _STUDENT_ID_PATTERN.match(sid):
+        return False, "Student ID must follow the format YYYY-NNNN (e.g. 2024-0001)"
 
     if not _NAME_PATTERN.match(firstname):
         return False, "First Name must contain only letters, spaces, apostrophes, or hyphens"

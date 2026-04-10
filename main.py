@@ -15,28 +15,36 @@ if getattr(sys, 'frozen', False):
     os.environ.setdefault('MPLBACKEND', 'TkAgg')
 
 import customtkinter as ctk
-from config import BG_COLOR, WINDOW_WIDTH, WINDOW_HEIGHT, resource_path
+from config import WINDOW_WIDTH, WINDOW_HEIGHT
 from backend import get_session, hash_password, init_files, verify_password
 from backend.models import College, Program, Student, User
-from backend.validators import validate_college, validate_password, validate_program, validate_student
+from backend.validators import validate_password
+from backend.students import StudentController
+from backend.programs import ProgramController
+from backend.colleges import CollegeController
 from frontend_ui.auth import LoginFrame
 from frontend_ui.dashboard import DashboardFrame
-from frontend_ui.ui.utils import show_dialog
+from frontend_ui.ui.utils import show_dialog, apply_window_icon
 
 
 class App(ctk.CTk):
     """Main application window."""
 
     def __init__(self):
+        if sys.platform.startswith("win"):
+            try:
+                import ctypes
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("calvynddb.nexo-database")
+            except Exception:
+                pass
+
         super().__init__()
         self.title("nexo")
         self.geometry(f"{WINDOW_WIDTH}x{WINDOW_HEIGHT}")
-        try:
-            self.iconbitmap(resource_path("assets/nexo.ico"))
-        except Exception:
-            pass
+        apply_window_icon(self)
         self.logged_in = False
         self._load_data()
+        self._init_controllers()
         self._build_frames()
         self.current_frame = None
         self.show_frame(DashboardFrame, fade=False)
@@ -110,403 +118,59 @@ class App(ctk.CTk):
         """Reload all data from database after modifications."""
         self._load_data()
 
+    def _init_controllers(self):
+        """Initialize CRUDL controllers used by UI-facing wrapper methods."""
+        self.student_controller = StudentController(get_session, self.refresh_data)
+        self.program_controller = ProgramController(get_session, self.refresh_data)
+        self.college_controller = CollegeController(get_session, self.refresh_data)
+
     def update_student(self, student_id: str, updates: dict) -> tuple[bool, str]:
-        """Update a student in the database and refresh cache.
-        
-        Args:
-            student_id: Student ID (e.g., "2023-0001")
-            updates: Dict with fields to update (firstname, lastname, gender, year, program)
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            student = session.query(Student).filter(Student.id == student_id).first()
-            
-            if not student:
-                return False, "Student not found"
-
-            clean_updates = {}
-            for key, value in (updates or {}).items():
-                if key in ('firstname', 'lastname', 'gender', 'year', 'program'):
-                    clean_updates[key] = str(value).strip() if value is not None else ""
-
-            existing_program_code = student.program.code if student.program else ""
-            candidate = {
-                'id': student.id,
-                'firstname': clean_updates.get('firstname', student.firstname),
-                'lastname': clean_updates.get('lastname', student.lastname),
-                'gender': clean_updates.get('gender', student.gender),
-                'year': clean_updates.get('year', str(student.year)),
-                'program': clean_updates.get('program', existing_program_code),
-            }
-            ok, msg = validate_student(candidate, require_program=False)
-            if not ok:
-                return False, msg
-            
-            # Handle program code -> program_id lookup
-            if 'program' in clean_updates:
-                program_code = clean_updates['program']
-                if program_code:
-                    program = session.query(Program).filter(Program.code == program_code).first()
-                    if not program:
-                        return False, f"Program '{program_code}' not found"
-                    student.program_id = program.id
-                else:
-                    student.program_id = None
-            
-            # Update allowed fields
-            if 'firstname' in clean_updates:
-                student.firstname = clean_updates['firstname'].title()
-            if 'lastname' in clean_updates:
-                student.lastname = clean_updates['lastname'].title()
-            if 'gender' in clean_updates:
-                student.gender = clean_updates['gender'].title()
-            if 'year' in clean_updates:
-                student.year = int(clean_updates['year'])
-            
-            session.commit()
-            self.refresh_data()
-            return True, "Student updated successfully"
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+        """Update a student in the database and refresh cache."""
+        return self.student_controller.update_student(student_id, updates)
 
     def delete_student(self, student_id: str) -> tuple[bool, str]:
-        """Delete a student from the database and refresh cache.
-        
-        Args:
-            student_id: Student ID (e.g., "2023-0001")
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        try:
-            session = get_session()
-            student = session.query(Student).filter(Student.id == student_id).first()
-            
-            if not student:
-                session.close()
-                return False, "Student not found"
-            
-            session.delete(student)
-            session.commit()
-            session.close()
-            self.refresh_data()
-            return True, "Student deleted successfully"
-        except Exception as e:
-            return False, f"Error: {str(e)}"
+        """Delete a student from the database and refresh cache."""
+        return self.student_controller.delete_student(student_id)
 
     def add_student(self, student_data: dict) -> tuple[bool, str]:
-        """Add a new student to the database and refresh cache.
-        
-        Args:
-            student_data: Dict with fields (id, firstname, lastname, gender, year, program)
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            candidate = {
-                'id': str(student_data.get('id', '')).strip(),
-                'firstname': str(student_data.get('firstname', '')).strip(),
-                'lastname': str(student_data.get('lastname', '')).strip(),
-                'gender': str(student_data.get('gender', '')).strip(),
-                'year': str(student_data.get('year', '')).strip(),
-                'program': str(student_data.get('program', '')).strip(),
-            }
-
-            ok, msg = validate_student(candidate, require_program=True)
-            if not ok:
-                return False, msg
-            
-            # Check if ID already exists
-            existing = session.query(Student).filter(Student.id == candidate['id']).first()
-            if existing:
-                return False, "Student ID already exists"
-            
-            # Look up program by code
-            program = session.query(Program).filter(Program.code == candidate['program']).first()
-            if not program:
-                return False, f"Program '{candidate['program']}' not found"
-            
-            # Create new student
-            new_student = Student(
-                id=candidate['id'],
-                firstname=candidate['firstname'].title(),
-                lastname=candidate['lastname'].title(),
-                program_id=program.id,
-                year=int(candidate['year']),
-                gender=candidate['gender'].title()
-            )
-            
-            session.add(new_student)
-            session.commit()
-            self.refresh_data()
-            return True, "Student added successfully"
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+        """Add a new student to the database and refresh cache."""
+        return self.student_controller.add_student(student_data)
 
     def update_program(self, program_code: str, updates: dict) -> tuple[bool, str]:
-        """Update a program in the database and refresh cache.
-        
-        Args:
-            program_code: Program code (e.g., "CS101")
-            updates: Dict with fields to update (name, college)
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            program = session.query(Program).filter(Program.code == program_code).first()
-            
-            if not program:
-                return False, "Program not found"
-
-            clean_updates = {}
-            for key, value in (updates or {}).items():
-                if key in ('name', 'college'):
-                    clean_updates[key] = str(value).strip() if value is not None else ""
-
-            existing_college_code = program.college.code if program.college else ""
-            candidate = {
-                'code': program.code,
-                'name': clean_updates.get('name', program.name),
-                'college': clean_updates.get('college', existing_college_code),
-            }
-            ok, msg = validate_program(candidate, require_college=False)
-            if not ok:
-                return False, msg
-            
-            # Handle college code -> college_id lookup
-            if 'college' in clean_updates:
-                college_code = clean_updates['college']
-                if college_code:
-                    college = session.query(College).filter(College.code == college_code).first()
-                    if not college:
-                        return False, f"College '{college_code}' not found"
-                    program.college_id = college.id
-                else:
-                    program.college_id = None
-            
-            # Update allowed fields
-            if 'name' in clean_updates:
-                program.name = clean_updates['name'].title()
-            
-            session.commit()
-            self.refresh_data()
-            return True, "Program updated successfully"
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+        """Update a program in the database and refresh cache."""
+        return self.program_controller.update_program(program_code, updates)
 
     def delete_program(self, program_code: str) -> tuple[bool, str]:
-        """Delete a program from the database and refresh cache.
-        
-        Args:
-            program_code: Program code (e.g., "CS101")
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            program = session.query(Program).filter(Program.code == program_code).first()
-
-            if not program:
-                return False, "Program not found"
-
-            affected_students_query = session.query(Student).filter(Student.program_id == program.id)
-            affected_students = affected_students_query.count()
-            for student in affected_students_query.all():
-                student.program_id = None
-
-            session.flush()
-            session.delete(program)
-            session.commit()
-            self.refresh_data()
-            return True, (
-                "Program deleted successfully. "
-                f"Cleared program assignment for {affected_students} student(s)."
-            )
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+        """Delete a program from the database and refresh cache."""
+        return self.program_controller.delete_program(program_code)
 
     def add_program(self, program_data: dict) -> tuple[bool, str]:
-        """Add a new program to the database and refresh cache.
-        
-        Args:
-            program_data: Dict with fields (code, name, college)
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            candidate = {
-                'code': str(program_data.get('code', '')).strip(),
-                'name': str(program_data.get('name', '')).strip(),
-                'college': str(program_data.get('college', '')).strip(),
-            }
-
-            ok, msg = validate_program(candidate, require_college=True)
-            if not ok:
-                return False, msg
-            
-            # Check if code already exists
-            existing = session.query(Program).filter(Program.code == candidate['code']).first()
-            if existing:
-                return False, "Program code already exists"
-            
-            # Look up college by code
-            college = session.query(College).filter(College.code == candidate['college']).first()
-            if not college:
-                return False, f"College '{candidate['college']}' not found"
-            
-            # Create new program
-            new_program = Program(
-                code=candidate['code'],
-                name=candidate['name'].title(),
-                college_id=college.id
-            )
-            
-            session.add(new_program)
-            session.commit()
-            self.refresh_data()
-            return True, "Program added successfully"
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+        """Add a new program to the database and refresh cache."""
+        return self.program_controller.add_program(program_data)
 
     def update_college(self, college_code: str, updates: dict) -> tuple[bool, str]:
-        """Update a college in the database and refresh cache.
-        
-        Args:
-            college_code: College code
-            updates: Dict with fields to update (name)
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            college = session.query(College).filter(College.code == college_code).first()
-            
-            if not college:
-                return False, "College not found"
-
-            clean_name = str((updates or {}).get('name', college.name) or '').strip()
-            candidate = {
-                'code': college.code,
-                'name': clean_name,
-            }
-            ok, msg = validate_college(candidate)
-            if not ok:
-                return False, msg
-            
-            # Update allowed fields
-            if 'name' in (updates or {}):
-                college.name = clean_name.title()
-            
-            session.commit()
-            self.refresh_data()
-            return True, "College updated successfully"
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+        """Update a college in the database and refresh cache."""
+        return self.college_controller.update_college(college_code, updates)
 
     def delete_college(self, college_code: str) -> tuple[bool, str]:
-        """Delete a college from the database and refresh cache.
-        
-        Args:
-            college_code: College code
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            college = session.query(College).filter(College.code == college_code).first()
-
-            if not college:
-                return False, "College not found"
-
-            affected_programs_query = session.query(Program).filter(Program.college_id == college.id)
-            affected_programs = affected_programs_query.count()
-            for program in affected_programs_query.all():
-                program.college_id = None
-
-            session.flush()
-            session.delete(college)
-            session.commit()
-            self.refresh_data()
-            return True, (
-                "College deleted successfully. "
-                f"Cleared college assignment for {affected_programs} program(s)."
-            )
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+        """Delete a college from the database and refresh cache."""
+        return self.college_controller.delete_college(college_code)
 
     def add_college(self, college_data: dict) -> tuple[bool, str]:
-        """Add a new college to the database and refresh cache.
-        
-        Args:
-            college_data: Dict with fields (code, name)
-            
-        Returns:
-            (success: bool, message: str)
-        """
-        session = get_session()
-        try:
-            candidate = {
-                'code': str(college_data.get('code', '')).strip(),
-                'name': str(college_data.get('name', '')).strip(),
-            }
+        """Add a new college to the database and refresh cache."""
+        return self.college_controller.add_college(college_data)
 
-            ok, msg = validate_college(candidate)
-            if not ok:
-                return False, msg
-            
-            # Check if code already exists
-            existing = session.query(College).filter(College.code == candidate['code']).first()
-            if existing:
-                return False, "College code already exists"
-            
-            # Create new college
-            new_college = College(
-                code=candidate['code'],
-                name=candidate['name'].title()
-            )
-            
-            session.add(new_college)
-            session.commit()
-            self.refresh_data()
-            return True, "College added successfully"
-        except Exception as e:
-            session.rollback()
-            return False, f"Error: {str(e)}"
-        finally:
-            session.close()
+    def bulk_upsert_students(self, records: list[dict], overwrite_existing: bool = False) -> tuple[bool, dict]:
+        """Create or update many students in one transaction."""
+        return self.student_controller.bulk_upsert_students(records, overwrite_existing=overwrite_existing)
+
+    def bulk_upsert_programs(self, records: list[dict], overwrite_existing: bool = False) -> tuple[bool, dict]:
+        """Create or update many programs in one transaction."""
+        return self.program_controller.bulk_upsert_programs(records, overwrite_existing=overwrite_existing)
+
+    def bulk_upsert_colleges(self, records: list[dict], overwrite_existing: bool = False) -> tuple[bool, dict]:
+        """Create or update many colleges in one transaction."""
+        return self.college_controller.bulk_upsert_colleges(records, overwrite_existing=overwrite_existing)
 
     def create_user(self, username: str, password: str) -> tuple[bool, str]:
         """Create a new user in the database.

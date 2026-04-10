@@ -7,7 +7,7 @@ Defines College, Program, Student, and User entities with relationships:
 - College/Program/Student share no direct relationship with User (auth-only)
 """
 
-from sqlalchemy import Column, Integer, String, ForeignKey, func
+from sqlalchemy import Column, Integer, String, ForeignKey, CheckConstraint
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -36,7 +36,7 @@ class Program(Base):
     id = Column(Integer, primary_key=True)
     code = Column(String(20), unique=True, nullable=False, index=True)
     name = Column(String(255), nullable=False)
-    college_id = Column(Integer, ForeignKey("colleges.id", ondelete="SET NULL"), nullable=True)
+    college_id = Column(Integer, ForeignKey("colleges.id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Relationships
     college = relationship("College", back_populates="programs")
@@ -47,13 +47,18 @@ class Program(Base):
 
 
 class Student(Base):
-    """Student entity: id is unique (format 202x-xxxx), assigned to a program."""
+    """Student entity: id is unique (format YYYY-NNNN), assigned to a program."""
     __tablename__ = "students"
+    __table_args__ = (
+        CheckConstraint("year BETWEEN 1 AND 5", name="ck_students_year_range"),
+        CheckConstraint("gender IN ('Male', 'Female', 'Other')", name="ck_students_gender_domain"),
+        CheckConstraint("id GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]'", name="ck_students_id_format"),
+    )
 
-    id = Column(String(10), primary_key=True)  # e.g. "2023-0001"
+    id = Column(String(10), primary_key=True)  # e.g. "2024-0001"
     firstname = Column(String(100), nullable=False)
     lastname = Column(String(100), nullable=False)
-    program_id = Column(Integer, ForeignKey("programs.id", ondelete="SET NULL"), nullable=True)
+    program_id = Column(Integer, ForeignKey("programs.id", ondelete="SET NULL"), nullable=True, index=True)
     year = Column(Integer, nullable=False)  # 1, 2, 3, or 4
     gender = Column(String(20), nullable=False)  # "Male", "Female", etc.
 

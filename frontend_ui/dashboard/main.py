@@ -23,8 +23,17 @@ from config import (
     SURFACE_SECTION,
     BTN_SEGMENT_FG, BTN_SEGMENT_HOVER,
 )
-from frontend_ui.ui import DepthCard, get_icon, get_main_logo, SoftLoadingOverlay, animate_toplevel_in, log_ui_timing
+from frontend_ui.ui import (
+    DepthCard,
+    get_icon,
+    get_main_logo,
+    apply_window_icon,
+    SoftLoadingOverlay,
+    animate_toplevel_in,
+    log_ui_timing,
+)
 from backend import create_backups
+from backend.services import FilterOrchestrationService, FilterStateService
 from frontend_ui.auth import LoginFrame
 
 
@@ -51,15 +60,14 @@ class DashboardFrame(ctk.CTkFrame):
 
         # lazy-import views here (not at module level) so matplotlib/numpy
         # are not loaded until the dashboard is actually constructed.
-        from frontend_ui.views.students import StudentsView
-        from frontend_ui.views.programs import ProgramsView
-        from frontend_ui.views.colleges import CollegesView
+        from frontend_ui.students import StudentsView
+        from frontend_ui.programs import ProgramsView
+        from frontend_ui.colleges import CollegesView
         self._StudentsView = StudentsView
         self._ProgramsView = ProgramsView
         self._CollegesView = CollegesView
         
-        self.grid_rowconfigure(2, weight=0)
-        self.grid_rowconfigure(3, weight=1)
+        self.grid_rowconfigure(2, weight=1)
         self.grid_columnconfigure(0, weight=1)
         
         # register as theme listener for dynamic updates
@@ -78,14 +86,14 @@ class DashboardFrame(ctk.CTkFrame):
 
         # main container with left content and right sidebar
         main_container = ctk.CTkFrame(self, fg_color="transparent")
-        main_container.grid(row=3, column=0, sticky="nsew", padx=0, pady=0)
+        main_container.grid(row=2, column=0, sticky="nsew", padx=0, pady=0)
         main_container.grid_rowconfigure(0, weight=1)
         main_container.grid_columnconfigure(0, weight=1)
         main_container.grid_columnconfigure(1, weight=0)
         
         # left content area - reduced top padding since title_bar has bottom padding
         self.content_area = ctk.CTkFrame(main_container, fg_color="transparent")
-        self.content_area.grid(row=0, column=0, sticky="nsew", padx=15, pady=(5, 15))
+        self.content_area.grid(row=0, column=0, sticky="nsew", padx=SPACE_MD, pady=(5, 15))
         self.content_area.grid_rowconfigure(0, weight=1)
         self.content_area.grid_columnconfigure(0, weight=1)
 
@@ -102,14 +110,14 @@ class DashboardFrame(ctk.CTkFrame):
         """Create unified top navigation bar with logo, text, tabs, and controls."""
         # wrapper with margin
         topbar_wrapper = ctk.CTkFrame(self, fg_color="transparent")
-        topbar_wrapper.grid(row=0, column=0, sticky="ew", padx=SPACE_LG, pady=(SPACE_LG, SPACE_SM))
+        topbar_wrapper.grid(row=0, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_LG, SPACE_SM))
         topbar_wrapper.grid_columnconfigure(0, weight=1)
         
         topbar = DepthCard(
             topbar_wrapper,
             height=86,
             fg_color=PANEL_COLOR,
-            corner_radius=RADIUS_MD,
+            corner_radius=RADIUS_LG,
             border_width=0,
             border_color=BORDER_COLOR,
         )
@@ -118,7 +126,7 @@ class DashboardFrame(ctk.CTkFrame):
         
         # main container with three sections
         inner = ctk.CTkFrame(topbar, fg_color="transparent")
-        inner.grid(row=0, column=0, sticky="nsew", padx=(SPACE_LG, SPACE_SM), pady=(SPACE_SM, SPACE_SM))
+        inner.grid(row=0, column=0, sticky="nsew", padx=(SPACE_LG, SPACE_LG), pady=(SPACE_SM, SPACE_SM))
         topbar.grid_rowconfigure(0, weight=1)
         topbar.grid_columnconfigure(0, weight=1)
         inner.grid_rowconfigure(0, weight=1)
@@ -149,7 +157,7 @@ class DashboardFrame(ctk.CTkFrame):
         nav_rail = ctk.CTkFrame(
             center_frame,
             fg_color=SURFACE_SECTION,
-            corner_radius=RADIUS_SM,
+            corner_radius=RADIUS_MD,
             border_width=0,
             border_color=BORDER_COLOR,
         )
@@ -248,14 +256,14 @@ class DashboardFrame(ctk.CTkFrame):
         """Create title bar with page title on left and action buttons on right."""
         # wrapper with margin - increased top margin for equal spacing
         title_bar_wrapper = ctk.CTkFrame(self, fg_color="transparent")
-        title_bar_wrapper.grid(row=1, column=0, sticky="ew", padx=SPACE_LG, pady=(SPACE_SM, SPACE_MD))
+        title_bar_wrapper.grid(row=1, column=0, sticky="ew", padx=SPACE_MD, pady=(SPACE_SM, SPACE_MD))
         title_bar_wrapper.grid_columnconfigure(0, weight=1)
         
         title_bar = DepthCard(
             title_bar_wrapper,
             height=86,
             fg_color=PANEL_COLOR,
-            corner_radius=RADIUS_MD,
+            corner_radius=RADIUS_LG,
             border_width=0,
             border_color=BORDER_COLOR,
         )
@@ -263,7 +271,7 @@ class DashboardFrame(ctk.CTkFrame):
         title_bar.grid_propagate(False)
         
         inner = ctk.CTkFrame(title_bar, fg_color="transparent")
-        inner.grid(row=0, column=0, sticky="nsew", padx=SPACE_MD, pady=(SPACE_MD, SPACE_MD))
+        inner.grid(row=0, column=0, sticky="nsew", padx=SPACE_LG, pady=(SPACE_MD, SPACE_MD))
         title_bar.grid_rowconfigure(0, weight=1)
         title_bar.grid_columnconfigure(0, weight=1)
         inner.grid_columnconfigure(0, weight=0)
@@ -283,12 +291,12 @@ class DashboardFrame(ctk.CTkFrame):
                          fg_color=ENTRY_BG, border_color=BORDER_COLOR,
                          border_width=BORDER_WIDTH_HAIRLINE,
                          text_color=TEXT_PRIMARY, font=get_font(13))
-        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, 15))
+        self.search_entry.grid(row=0, column=1, sticky="ew", padx=(0, SPACE_MD))
         self.search_entry.bind("<KeyRelease>", self.handle_search_dynamic)
         
         # right: button container
         button_container = ctk.CTkFrame(inner, fg_color="transparent")
-        button_container.grid(row=0, column=2, sticky="e", padx=(0, 0))
+        button_container.grid(row=0, column=2, sticky="e", padx=(0, SPACE_SM))
         
         # refresh button with icon
         # use packaged icon asset for refresh (avoid absolute local paths)
@@ -356,28 +364,48 @@ class DashboardFrame(ctk.CTkFrame):
             self.multi_edit_btn.configure(state="normal")
 
     def create_filter_panel(self):
-        """Create a collapsible advanced filter panel for the active view."""
-        self.filter_panel_wrapper = ctk.CTkFrame(self, fg_color="transparent")
-        self.filter_panel_wrapper.grid(row=2, column=0, sticky="ew", padx=SPACE_LG, pady=(0, SPACE_SM))
-        self.filter_panel_wrapper.grid_columnconfigure(0, weight=1)
+        """Initialize advanced filter popup state."""
+        self.filter_window = None
+        self.filter_title_label = None
+        self.filter_summary_label = None
+        self.apply_filters_btn = None
+        self.reset_filters_btn = None
+        self.hide_filters_btn = None
+        self.filter_fields_frame = None
+
+    def _ensure_filter_popup(self):
+        window = getattr(self, "filter_window", None)
+        if window is not None and window.winfo_exists():
+            return
+
+        window = ctk.CTkToplevel(self)
+        window.title("Advanced Filters")
+        apply_window_icon(window)
+        window.configure(fg_color=BG_COLOR)
+        window.attributes("-topmost", True)
+        window.transient(self.winfo_toplevel())
+        window.protocol("WM_DELETE_WINDOW", self.toggle_filter_panel)
+
+        container = ctk.CTkFrame(window, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=16, pady=16)
 
         filter_card = DepthCard(
-            self.filter_panel_wrapper,
+            container,
             fg_color=PANEL_COLOR,
             corner_radius=RADIUS_SM,
             border_width=0,
             border_color=BORDER_COLOR,
         )
-        filter_card.pack(fill="x", expand=True)
+        filter_card.pack(fill="both", expand=True)
 
         content = ctk.CTkFrame(filter_card, fg_color="transparent")
-        content.pack(fill="x", padx=SPACE_MD, pady=SPACE_SM)
+        content.pack(fill="both", expand=True, padx=SPACE_MD, pady=SPACE_SM)
 
         top_row = ctk.CTkFrame(content, fg_color="transparent")
         top_row.pack(fill="x")
 
         left_row = ctk.CTkFrame(top_row, fg_color="transparent")
-        left_row.pack(side="left")
+        left_row.pack(side="left", fill="x", expand=True)
 
         self.filter_title_label = ctk.CTkLabel(
             left_row,
@@ -395,8 +423,10 @@ class DashboardFrame(ctk.CTkFrame):
         )
         self.filter_summary_label.pack(side="left")
 
-        action_row = ctk.CTkFrame(top_row, fg_color="transparent")
-        action_row.pack(side="right")
+        action_row = ctk.CTkFrame(content, fg_color="transparent")
+        action_row.pack(fill="x", pady=(8, 0))
+        for col in range(3):
+            action_row.grid_columnconfigure(col, weight=1)
 
         self.apply_filters_btn = ctk.CTkButton(
             action_row,
@@ -412,7 +442,7 @@ class DashboardFrame(ctk.CTkFrame):
             border_color=BORDER_COLOR,
             command=self.apply_current_filters,
         )
-        self.apply_filters_btn.pack(side="left", padx=(0, 6))
+        self.apply_filters_btn.grid(row=0, column=0, sticky="ew", padx=(0, 4))
 
         self.reset_filters_btn = ctk.CTkButton(
             action_row,
@@ -428,7 +458,7 @@ class DashboardFrame(ctk.CTkFrame):
             border_color=BORDER_COLOR,
             command=self.reset_current_filters,
         )
-        self.reset_filters_btn.pack(side="left", padx=(0, 6))
+        self.reset_filters_btn.grid(row=0, column=1, sticky="ew", padx=4)
 
         self.hide_filters_btn = ctk.CTkButton(
             action_row,
@@ -444,15 +474,40 @@ class DashboardFrame(ctk.CTkFrame):
             border_color=BORDER_COLOR,
             command=self.toggle_filter_panel,
         )
-        self.hide_filters_btn.pack(side="left")
+        self.hide_filters_btn.grid(row=0, column=2, sticky="ew", padx=(4, 0))
 
-        self.filter_fields_frame = ctk.CTkFrame(content, fg_color="transparent")
-        self.filter_fields_frame.pack(fill="x", pady=(6, 0))
+        self.filter_fields_frame = ctk.CTkScrollableFrame(content, fg_color="transparent")
+        self.filter_fields_frame.pack(fill="both", expand=True, pady=(10, 0))
 
-        self.filter_panel_wrapper.grid_remove()
+        self.filter_window = window
+        self._position_filter_popup()
+        window.withdraw()
+
+    def _position_filter_popup(self):
+        window = getattr(self, "filter_window", None)
+        if window is None or not window.winfo_exists():
+            return
+
+        try:
+            self.update_idletasks()
+            window.update_idletasks()
+            screen_width = window.winfo_screenwidth()
+            screen_height = window.winfo_screenheight()
+            popup_width = min(screen_width - 40, max(360, min(440, int(self.winfo_width() * 0.34))))
+            field_count = len(self.filter_vars) if self.filter_vars else 0
+            if field_count <= 0:
+                field_count = len(self._default_filter_state(self.current_view)) if self.current_view else 4
+            visible_rows = min(max(2, field_count), 6)
+            desired_height = 170 + (visible_rows * 58)
+            popup_height = min(screen_height - 90, max(300, desired_height))
+            x = max(20, (screen_width - popup_width) // 2)
+            y = max(30, (screen_height - popup_height) // 2)
+            window.geometry(f"{popup_width}x{popup_height}+{x}+{y}")
+        except Exception:
+            pass
 
     def toggle_filter_panel(self):
-        """Show or hide the advanced filter panel."""
+        """Show or hide the advanced filter popup."""
         started_at = time.perf_counter()
         target_visible = not self.filter_panel_visible
         if not target_visible:
@@ -462,6 +517,7 @@ class DashboardFrame(ctk.CTkFrame):
         self.filter_panel_visible = target_visible
 
         if self.filter_panel_visible:
+            self._ensure_filter_popup()
             if self._needs_filter_rebuild(self.current_view):
                 self._run_with_loading("Preparing filters", lambda: self._build_filter_controls(self.current_view))
             else:
@@ -487,68 +543,53 @@ class DashboardFrame(ctk.CTkFrame):
             self._filter_panel_after_id = None
 
     def _show_filter_panel_animated(self):
-        # Zero-gap first: show immediately so controls are visible as soon as ready.
         self._cancel_filter_panel_animation()
-        self.filter_panel_wrapper.grid_propagate(True)
-        self.filter_panel_wrapper.grid()
+        window = getattr(self, "filter_window", None)
+        if window is None or not window.winfo_exists():
+            return
+        self._position_filter_popup()
+        window.deiconify()
+        window.lift()
+        window.focus_force()
 
     def _hide_filter_panel_animated(self):
-        # Zero-gap first: remove immediately so table/content reflow has no dead interval.
         self._cancel_filter_panel_animation()
-        self.filter_panel_wrapper.grid_remove()
-        self.filter_panel_wrapper.grid_propagate(True)
+        window = getattr(self, "filter_window", None)
+        if window is None or not window.winfo_exists():
+            return
+        window.withdraw()
 
     def _default_filter_state(self, view_class):
-        if view_class == self._StudentsView:
-            return {
-                "id": "",
-                "firstname": "",
-                "lastname": "",
-                "gender": "Any",
-                "year": "Any",
-                "program": "Any",
-                "college": "Any",
-            }
-        if view_class == self._ProgramsView:
-            return {
-                "code": "",
-                "name": "",
-                "college": "Any",
-            }
-        return {
-            "code": "",
-            "name": "",
-        }
+        view_key = self._resolve_filter_view_key(view_class)
+        return FilterStateService.default_state(view_key)
+
+    def _resolve_filter_view_key(self, view_class) -> str:
+        return FilterStateService.resolve_view_key(
+            view_class,
+            self._StudentsView,
+            self._ProgramsView,
+            self._CollegesView,
+        )
 
     def _get_filter_data_signature(self, view_class):
-        if not view_class:
-            return ("none",)
-        if view_class == self._StudentsView:
-            return (
-                "students",
-                id(self.controller.students), len(self.controller.students),
-                id(self.controller.programs), len(self.controller.programs),
-                id(self.controller.colleges), len(self.controller.colleges),
-            )
-        if view_class == self._ProgramsView:
-            return (
-                "programs",
-                id(self.controller.programs), len(self.controller.programs),
-                id(self.controller.colleges), len(self.controller.colleges),
-            )
-        return (
-            "colleges",
-            id(self.controller.colleges), len(self.controller.colleges),
+        view_key = self._resolve_filter_view_key(view_class)
+        return FilterStateService.data_signature(
+            view_key,
+            self.controller.students,
+            self.controller.programs,
+            self.controller.colleges,
         )
 
     def _needs_filter_rebuild(self, view_class) -> bool:
         if not view_class:
             return False
         signature = self._get_filter_data_signature(view_class)
-        return not (
-            self._filter_controls_view == view_class
-            and self._filter_controls_data_signature.get(view_class) == signature
-            and bool(self.filter_vars)
+        return FilterOrchestrationService.should_rebuild_controls(
+            self._filter_controls_view,
+            self._filter_controls_data_signature,
+            view_class,
+            signature,
+            bool(self.filter_vars),
         )
 
     def _run_with_loading(self, message: str, action):
@@ -577,89 +618,43 @@ class DashboardFrame(ctk.CTkFrame):
                 self.loading_overlay.hide()
 
     def _get_filter_schema(self, view_class, data_signature=None):
-        cache_key = (view_class, data_signature)
+        view_key = self._resolve_filter_view_key(view_class)
+        cache_key = (view_key, data_signature)
         if data_signature is not None and cache_key in self._filter_schema_cache:
             return self._filter_schema_cache[cache_key]
 
-        if view_class == self._StudentsView:
-            years = sorted(
-                {str(s.get("year", "")).strip() for s in self.controller.students if str(s.get("year", "")).strip()},
-                key=lambda v: (0, int(v)) if v.isdigit() else (1, v),
-            )
-            program_codes = sorted(
-                {str(p.get("code", "")).strip() for p in self.controller.programs if str(p.get("code", "")).strip()}
-            )
-            college_codes = sorted(
-                {str(c.get("code", "")).strip() for c in self.controller.colleges if str(c.get("code", "")).strip()}
-            )
-            schema = [
-                {"key": "id", "label": "ID", "type": "entry", "placeholder": "Contains ID"},
-                {"key": "firstname", "label": "First Name", "type": "entry", "placeholder": "Contains first name"},
-                {"key": "lastname", "label": "Last Name", "type": "entry", "placeholder": "Contains last name"},
-                {"key": "gender", "label": "Gender", "type": "combo", "values": ["Any", "Male", "Female", "Other"]},
-                {"key": "year", "label": "Year", "type": "combo", "values": ["Any"] + years},
-                {"key": "program", "label": "Program", "type": "combo", "values": ["Any"] + program_codes},
-                {"key": "college", "label": "College", "type": "combo", "values": ["Any"] + college_codes},
-            ]
-            if data_signature is not None:
-                self._filter_schema_cache[cache_key] = schema
-            return schema
-
-        if view_class == self._ProgramsView:
-            college_codes = sorted(
-                {str(c.get("code", "")).strip() for c in self.controller.colleges if str(c.get("code", "")).strip()}
-            )
-            schema = [
-                {"key": "code", "label": "Code", "type": "entry", "placeholder": "Contains code"},
-                {"key": "name", "label": "Program Name", "type": "entry", "placeholder": "Contains program"},
-                {"key": "college", "label": "College", "type": "combo", "values": ["Any"] + college_codes},
-            ]
-            if data_signature is not None:
-                self._filter_schema_cache[cache_key] = schema
-            return schema
-
-        schema = [
-            {"key": "code", "label": "Code", "type": "entry", "placeholder": "Contains code"},
-            {"key": "name", "label": "College Name", "type": "entry", "placeholder": "Contains college"},
-        ]
+        schema = FilterStateService.schema(
+            view_key,
+            self.controller.students,
+            self.controller.programs,
+            self.controller.colleges,
+        )
         if data_signature is not None:
             self._filter_schema_cache[cache_key] = schema
         return schema
 
     def _ensure_filter_state(self, view_class):
         defaults = self._default_filter_state(view_class)
-        state = dict(self.view_filter_state.get(view_class, {}))
-
-        for key, default in defaults.items():
-            state.setdefault(key, default)
-
-        for key in list(state.keys()):
-            if key not in defaults:
-                state.pop(key)
-
+        state = FilterStateService.ensure_state(self.view_filter_state.get(view_class, {}), defaults)
         self.view_filter_state[view_class] = state
         return state
 
     def _active_filter_count(self, state: dict) -> int:
-        count = 0
-        for value in state.values():
-            text = str(value).strip()
-            if text and text.lower() != "any":
-                count += 1
-        return count
+        return FilterStateService.active_filter_count(state)
 
     def _update_filter_summary(self, view_class):
-        if not hasattr(self, "filter_summary_label"):
+        summary_label = getattr(self, "filter_summary_label", None)
+        if summary_label is None or not summary_label.winfo_exists():
             return
         if not view_class:
-            self.filter_summary_label.configure(text="0 active · 0 results")
+            summary_label.configure(text="0 active · 0 results")
             self._update_filter_button_state(0)
             return
 
         state = self._ensure_filter_state(view_class)
         active_count = self._active_filter_count(state)
         result_count = self._current_result_count(view_class)
-        self.filter_summary_label.configure(text=f"{active_count} active · {result_count} results")
+        summary_label.configure(text=f"{active_count} active · {result_count} results")
         self._update_filter_button_state(active_count)
 
     def _current_result_count(self, view_class) -> int:
@@ -739,12 +734,19 @@ class DashboardFrame(ctk.CTkFrame):
         self._update_filter_summary(self.current_view)
 
     def _build_filter_controls(self, view_class):
-        if not hasattr(self, "filter_fields_frame"):
+        filter_fields_frame = getattr(self, "filter_fields_frame", None)
+        filter_title_label = getattr(self, "filter_title_label", None)
+        if (
+            filter_fields_frame is None
+            or not filter_fields_frame.winfo_exists()
+            or filter_title_label is None
+            or not filter_title_label.winfo_exists()
+        ):
             return
 
         if not view_class:
             self.filter_vars = {}
-            self.filter_title_label.configure(text="Filters")
+            filter_title_label.configure(text="Filters")
             self._filter_controls_view = None
             self._update_filter_summary(None)
             return
@@ -757,12 +759,8 @@ class DashboardFrame(ctk.CTkFrame):
             and bool(self.filter_vars)
         )
 
-        label = "Students"
-        if view_class == self._ProgramsView:
-            label = "Programs"
-        elif view_class == self._CollegesView:
-            label = "Colleges"
-        self.filter_title_label.configure(text=f"Filters · {label}")
+        label = FilterStateService.view_label(self._resolve_filter_view_key(view_class))
+        filter_title_label.configure(text=f"Filters · {label}")
 
         if controls_unchanged:
             self._is_building_filter_controls = True
@@ -778,34 +776,24 @@ class DashboardFrame(ctk.CTkFrame):
 
         self._is_building_filter_controls = True
         try:
-            for child in self.filter_fields_frame.winfo_children():
+            for child in filter_fields_frame.winfo_children():
                 child.destroy()
             self.filter_vars = {}
             schema = self._get_filter_schema(view_class, data_signature=data_signature)
 
-            max_columns = 5 if view_class == self._StudentsView else 4
-            for col in range(max_columns):
-                self.filter_fields_frame.grid_columnconfigure(col, weight=1)
-
-            for idx, field in enumerate(schema):
+            for field in schema:
                 key = field["key"]
-                row = idx // max_columns
-                col = idx % max_columns
 
-                cell = ctk.CTkFrame(self.filter_fields_frame, fg_color="transparent")
-                cell.grid(row=row, column=col, sticky="ew", padx=4, pady=2)
-
-                row_frame = ctk.CTkFrame(cell, fg_color="transparent")
-                row_frame.pack(fill="x")
+                cell = ctk.CTkFrame(filter_fields_frame, fg_color="transparent")
+                cell.pack(fill="x", padx=2, pady=(0, 8))
 
                 ctk.CTkLabel(
-                    row_frame,
+                    cell,
                     text=field["label"],
                     font=get_font(10, True),
                     text_color=TEXT_MUTED,
-                    width=56,
                     anchor="w",
-                ).pack(side="left", padx=(0, 4))
+                ).pack(fill="x", padx=(2, 0), pady=(0, 3))
 
                 value = str(state.get(key, ""))
                 var = tk.StringVar(value=value)
@@ -816,10 +804,10 @@ class DashboardFrame(ctk.CTkFrame):
                     if value not in values:
                         var.set(values[0])
                     widget = ctk.CTkOptionMenu(
-                        row_frame,
+                        cell,
                         variable=var,
                         values=values,
-                        height=30,
+                        height=32,
                         fg_color=ENTRY_BG,
                         button_color=BTN_PRIMARY_FG,
                         button_hover_color=BTN_PRIMARY_HOVER,
@@ -827,20 +815,20 @@ class DashboardFrame(ctk.CTkFrame):
                         font=get_font(11),
                         command=self._on_filter_option_changed,
                     )
-                    widget.pack(side="left", fill="x", expand=True)
+                    widget.pack(fill="x")
                 else:
                     widget = ctk.CTkEntry(
-                        row_frame,
+                        cell,
                         textvariable=var,
                         placeholder_text=field.get("placeholder", field["label"]),
-                        height=30,
+                        height=32,
                         fg_color=ENTRY_BG,
                         border_width=BORDER_WIDTH_HAIRLINE,
                         border_color=BORDER_COLOR,
                         text_color=TEXT_PRIMARY,
                         font=get_font(11),
                     )
-                    widget.pack(side="left", fill="x", expand=True)
+                    widget.pack(fill="x")
                     widget.bind("<Return>", self.apply_current_filters)
                     widget.bind("<KeyRelease>", self._on_filter_input_changed)
         finally:
@@ -850,6 +838,8 @@ class DashboardFrame(ctk.CTkFrame):
         self._filter_controls_data_signature[view_class] = data_signature
 
         self._update_filter_summary(view_class)
+        if self.filter_panel_visible:
+            self._position_filter_popup()
 
     def apply_current_filters(self, _event=None, force: bool = False):
         """Apply active quick search and advanced filters to the active view."""
@@ -866,13 +856,21 @@ class DashboardFrame(ctk.CTkFrame):
         query = self.search_entry.get().strip().lower()
         filters = dict(self.view_filter_state.get(self.current_view, {}))
 
-        normalized_filters = tuple(sorted((str(k), str(v).strip().lower()) for k, v in filters.items()))
-        signature = (query, normalized_filters)
-        if not force and self._last_filter_signature_by_view.get(self.current_view) == signature:
+        signature = FilterOrchestrationService.normalized_apply_signature(query, filters)
+        if FilterOrchestrationService.should_skip_apply(
+            self._last_filter_signature_by_view,
+            self.current_view,
+            signature,
+            force=force,
+        ):
             self._update_filter_summary(self.current_view)
             return
 
-        self._last_filter_signature_by_view[self.current_view] = signature
+        FilterOrchestrationService.record_apply_signature(
+            self._last_filter_signature_by_view,
+            self.current_view,
+            signature,
+        )
         view = self.views[self.current_view]
 
         if hasattr(view, "apply_filters"):
@@ -902,12 +900,14 @@ class DashboardFrame(ctk.CTkFrame):
         """Refresh the current view's data from SQLite and update table + sidebar."""
         def _refresh():
             self.controller.refresh_data()
-            self._filter_schema_cache.clear()
-            self._filter_controls_data_signature.clear()
+            FilterOrchestrationService.clear_caches(
+                self._filter_schema_cache,
+                self._filter_controls_data_signature,
+                self._last_filter_signature_by_view,
+            )
             self._filter_controls_view = None
             if self.current_view and self.current_view in self.views:
                 view = self.views[self.current_view]
-                self._last_filter_signature_by_view.pop(self.current_view, None)
                 if self.filter_panel_visible:
                     self._build_filter_controls(self.current_view)
                 self.apply_current_filters(force=True)
@@ -972,10 +972,9 @@ class DashboardFrame(ctk.CTkFrame):
 
             self.apply_current_filters(force=True)
 
-        if self.filter_panel_visible and self._needs_filter_rebuild(view_class):
-            self._run_with_loading("Preparing view", _apply_view_state)
-        else:
-            _apply_view_state()
+        needs_filter_prepare = self.filter_panel_visible and self._needs_filter_rebuild(view_class)
+        loading_message = "Preparing view" if needs_filter_prepare else "Switching view"
+        self._run_with_loading(loading_message, _apply_view_state)
     
     def update_title_card(self, view_class):
         """Update title card label and button based on active view."""
@@ -1019,6 +1018,7 @@ class DashboardFrame(ctk.CTkFrame):
 
         panel = ctk.CTkToplevel(self)
         panel.title("Admin Management")
+        apply_window_icon(panel)
         panel.geometry("480x560")
         panel.configure(fg_color=BG_COLOR)
         panel.attributes('-topmost', True)
@@ -1147,6 +1147,7 @@ class DashboardFrame(ctk.CTkFrame):
         """Open Settings window."""
         settings_window = ctk.CTkToplevel(self)
         settings_window.title("Settings")
+        apply_window_icon(settings_window)
         settings_window.geometry("580x680")
         settings_window.configure(fg_color=BG_COLOR)
         settings_window.attributes('-topmost', True)

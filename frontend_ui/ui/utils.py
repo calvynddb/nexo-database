@@ -25,6 +25,9 @@ from config import (
     BORDER_WIDTH_HAIRLINE,
     ANIMATIONS_ENABLED,
     REDUCED_MOTION,
+    GRADIENT_BRAND_PRIMARY,
+    GRADIENT_BRAND_SOFT,
+    GRADIENT_BRAND_MUTED,
     RADIUS_SM,
     RADIUS_MD,
     get_font,
@@ -35,6 +38,7 @@ from config import (
 
 # icon cache to avoid reloading
 _icon_cache = {}
+_window_icon_photo = None
 _UI_TIMING_ENABLED = str(os.getenv("NEXO_UI_TIMING", "")).strip().lower() in {
     "1",
     "true",
@@ -49,6 +53,165 @@ def log_ui_timing(label: str, started_at: float, warn_ms: int = 90) -> float:
     if _UI_TIMING_ENABLED or elapsed_ms >= max(0, int(warn_ms)):
         print(f"[ui-timing] {label}: {elapsed_ms:.1f}ms")
     return elapsed_ms
+
+
+def apply_window_icon(window) -> bool:
+    """Apply the app icon to a Tk/CTk toplevel window when available."""
+    if window is None:
+        return False
+
+    icon_path = resource_path("assets/nexo.ico")
+    try:
+        window.iconbitmap(icon_path)
+        return True
+    except Exception:
+        pass
+
+    global _window_icon_photo
+    if _window_icon_photo is None:
+        logo_path = resource_path("assets/Main Logo.png")
+        try:
+            _window_icon_photo = tk.PhotoImage(file=logo_path)
+        except Exception:
+            _window_icon_photo = False
+
+    if _window_icon_photo:
+        try:
+            window.iconphoto(True, _window_icon_photo)
+            return True
+        except Exception:
+            pass
+
+    return False
+
+
+def _hex_to_rgb(color: str):
+    color = str(color).strip().lstrip("#")
+    if len(color) != 6:
+        return (151, 112, 248)
+    try:
+        return tuple(int(color[i:i + 2], 16) for i in (0, 2, 4))
+    except Exception:
+        return (151, 112, 248)
+
+
+def _rgb_to_hex(rgb):
+    r, g, b = rgb
+    r = max(0, min(255, int(r)))
+    g = max(0, min(255, int(g)))
+    b = max(0, min(255, int(b)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _mix_hex(start_color: str, end_color: str, t: float) -> str:
+    sr, sg, sb = _hex_to_rgb(start_color)
+    er, eg, eb = _hex_to_rgb(end_color)
+    t = max(0.0, min(1.0, float(t)))
+    return _rgb_to_hex((
+        sr + (er - sr) * t,
+        sg + (eg - sg) * t,
+        sb + (eb - sb) * t,
+    ))
+
+
+def create_gradient_strip(parent, height: int = 3, colors=None, padx=0, pady=(0, 8)):
+    """Create and pack a horizontal gradient strip in a CTk/Tk container."""
+    if colors is None:
+        colors = GRADIENT_BRAND_MUTED
+
+    palette = [str(c) for c in colors if str(c).strip()]
+    if len(palette) < 2:
+        palette = [ACCENT_COLOR, ACCENT_COLOR]
+
+    strip = tk.Canvas(
+        parent,
+        height=max(1, int(height)),
+        highlightthickness=0,
+        bd=0,
+        relief="flat",
+        bg=PANEL_COLOR,
+    )
+    strip.pack(fill="x", padx=padx, pady=pady)
+
+    def _draw(_event=None):
+        strip.delete("grad")
+        width = max(1, strip.winfo_width())
+        strip_height = max(1, int(height))
+        segments = max(1, len(palette) - 1)
+
+        for x in range(width):
+            pos = x / max(1, width - 1)
+            seg = min(int(pos * segments), segments - 1)
+            local = (pos * segments) - seg
+            tone = _mix_hex(palette[seg], palette[seg + 1], local)
+            strip.create_line(x, 0, x, strip_height, fill=tone, tags=("grad",))
+
+    strip.bind("<Configure>", _draw)
+    try:
+        strip.after(0, _draw)
+    except Exception:
+        pass
+    return strip
+
+
+def create_gradient_background(
+    parent,
+    colors=None,
+    relx: float = 0.5,
+    rely: float = 0.5,
+    relwidth: float = 1.0,
+    relheight: float = 1.0,
+    anchor: str = "center",
+    orientation: str = "vertical",
+):
+    """Create a real gradient background canvas inside a container."""
+    if colors is None:
+        colors = GRADIENT_BRAND_SOFT
+
+    palette = [str(c) for c in colors if str(c).strip()]
+    if len(palette) < 2:
+        palette = [GRADIENT_BRAND_MUTED[0], GRADIENT_BRAND_MUTED[-1]]
+
+    canvas = tk.Canvas(
+        parent,
+        highlightthickness=0,
+        bd=0,
+        relief="flat",
+        bg=palette[0],
+    )
+    canvas.place(
+        relx=relx,
+        rely=rely,
+        relwidth=max(0.01, float(relwidth)),
+        relheight=max(0.01, float(relheight)),
+        anchor=anchor,
+    )
+
+    def _draw(_event=None):
+        canvas.delete("grad-bg")
+        width = max(1, canvas.winfo_width())
+        height = max(1, canvas.winfo_height())
+        vertical = str(orientation).lower() != "horizontal"
+        steps = height if vertical else width
+        segments = max(1, len(palette) - 1)
+
+        for i in range(steps):
+            pos = i / max(1, steps - 1)
+            seg = min(int(pos * segments), segments - 1)
+            local = (pos * segments) - seg
+            tone = _mix_hex(palette[seg], palette[seg + 1], local)
+            if vertical:
+                canvas.create_line(0, i, width, i, fill=tone, tags=("grad-bg",))
+            else:
+                canvas.create_line(i, 0, i, height, fill=tone, tags=("grad-bg",))
+
+    canvas.bind("<Configure>", _draw)
+    try:
+        canvas.after(0, _draw)
+    except Exception:
+        pass
+
+    return canvas
 
 
 class SoftLoadingOverlay:
@@ -148,6 +311,7 @@ def show_dialog(parent, title, message, dialog_type="info", callback=None):
 
     dialog_window = ctk.CTkToplevel(parent)
     dialog_window.title(title)
+    apply_window_icon(dialog_window)
     dialog_window.overrideredirect(False)
     dialog_window.configure(fg_color=BG_COLOR)
     dialog_window.attributes('-topmost', True)

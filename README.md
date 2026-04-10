@@ -89,6 +89,30 @@ nexo/
 |- nexo.db
 |- backend/
 |  |- __init__.py
+|  |- students/
+|  |  |- controller.py
+|  |  |- service.py
+|  |  |- repository.py
+|  |  |- validators.py
+|  |  |- queries.py
+|  |  |- sorts.py
+|  |- programs/
+|  |  |- controller.py
+|  |  |- service.py
+|  |  |- repository.py
+|  |  |- validators.py
+|  |  |- queries.py
+|  |  |- sorts.py
+|  |- colleges/
+|  |  |- controller.py
+|  |  |- service.py
+|  |  |- repository.py
+|  |  |- validators.py
+|  |  |- queries.py
+|  |  |- sorts.py
+|  |- controllers/      (compatibility wrappers)
+|  |- services/         (compatibility wrappers + shared services)
+|  |- repositories/     (compatibility wrappers)
 |  |- auth.py
 |  |- database.py
 |  |- models.py
@@ -97,12 +121,43 @@ nexo/
 |  |- search/
 |  |- sort/
 |- frontend_ui/
+|  |- students/
+|  |  |- list_view.py
+|  |- programs/
+|  |  |- list_view.py
+|  |- colleges/
+|  |  |- list_view.py
 |  |- auth/
 |  |- dashboard/
-|  |- views/
+|  |- views/            (compatibility wrappers)
 |  |- ui/
 |- assets/
 ```
+
+### CRUDL Navigation Guide
+
+Use the feature packages first when navigating code:
+
+- Student CRUDL:
+  - backend/students/controller.py
+  - backend/students/service.py
+  - backend/students/repository.py
+- Program CRUDL:
+  - backend/programs/controller.py
+  - backend/programs/service.py
+  - backend/programs/repository.py
+- College CRUDL:
+  - backend/colleges/controller.py
+  - backend/colleges/service.py
+  - backend/colleges/repository.py
+
+Frontend list views are feature-oriented as well (canonical implementation paths):
+
+- frontend_ui/students/list_view.py
+- frontend_ui/programs/list_view.py
+- frontend_ui/colleges/list_view.py
+
+Legacy layer-first folders are still present as compatibility wrappers during migration.
 
 ---
 

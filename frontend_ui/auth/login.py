@@ -29,7 +29,7 @@ from config import (
     RADIUS_MD,
     RADIUS_XL,
 )
-from frontend_ui.ui import DepthCard, get_icon, get_main_logo
+from frontend_ui.ui import DepthCard, get_icon, get_main_logo, apply_window_icon
 
 
 class LoginFrame(ctk.CTkFrame):
@@ -58,9 +58,6 @@ class LoginFrame(ctk.CTkFrame):
         card.grid(row=0, column=0, padx=SPACE_LG, pady=SPACE_LG)
         card.grid_propagate(False)
         card.pack_propagate(False)
-
-        title_strip = ctk.CTkFrame(card, fg_color=ACCENT_COLOR, height=4, corner_radius=0)
-        title_strip.pack(fill="x", padx=0, pady=(0, SPACE_SM))
 
         # logo - extra large for prominent display
         logo_frame = ctk.CTkFrame(card, fg_color="transparent", corner_radius=0, border_width=0)
@@ -96,6 +93,19 @@ class LoginFrame(ctk.CTkFrame):
             corner_radius=RADIUS_SM,
                       command=self.handle_login).pack(fill="x", padx=50, pady=(22, 40))
 
+        ctk.CTkButton(
+            card,
+            text="Proceed as Administrator",
+            font=get_font(12, True),
+            fg_color=BTN_SEGMENT_FG,
+            text_color="white",
+            hover_color=BTN_SEGMENT_HOVER,
+            border_width=0,
+            height=CONTROL_HEIGHT_MD,
+            corner_radius=RADIUS_SM,
+            command=self.proceed_as_admin,
+        ).pack(fill="x", padx=50, pady=(0, 20))
+
     def on_frame_shown(self):
         """Clear login fields when frame is shown (e.g. after logout)."""
         self.username_entry.delete(0, "end")
@@ -118,6 +128,12 @@ class LoginFrame(ctk.CTkFrame):
         )
         entry.pack(fill="x", padx=50, pady=(0, 10))
         return entry
+
+    def proceed_as_admin(self):
+        """Bypass credential entry and continue in administrator mode."""
+        self.controller.logged_in = True
+        from frontend_ui.dashboard import DashboardFrame
+        self.controller.show_frame(DashboardFrame)
 
     def handle_login(self):
         user = self.username_entry.get().strip()
@@ -152,6 +168,7 @@ class LoginFrame(ctk.CTkFrame):
         """Handle registration button press."""
         reg_window = ctk.CTkToplevel(self)
         reg_window.title("Register New Administrator")
+        apply_window_icon(reg_window)
         reg_window.geometry("500x580")
         reg_window.configure(fg_color=BG_COLOR)
         reg_window.attributes('-topmost', True)
@@ -168,7 +185,6 @@ class LoginFrame(ctk.CTkFrame):
         
         form_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=0, border_color=BORDER_COLOR)
         form_card.pack(fill="both", expand=True)
-        ctk.CTkFrame(form_card, fg_color=ACCENT_COLOR, height=3, corner_radius=0).pack(fill="x", pady=(0, SPACE_SM))
         frame = ctk.CTkScrollableFrame(form_card, fg_color="transparent")
         frame.pack(fill="both", expand=True, padx=SPACE_MD, pady=SPACE_SM)
         

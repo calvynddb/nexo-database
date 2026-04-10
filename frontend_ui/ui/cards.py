@@ -10,10 +10,10 @@ from config import (
     get_font,
     PANEL_COLOR,
     BORDER_COLOR,
+    SHADOW_EDGE_COLOR,
     TEXT_MUTED,
     TEXT_PRIMARY,
     SURFACE_SOFT,
-    ACCENT_COLOR,
     BORDER_WIDTH_HAIRLINE,
     RADIUS_LG,
     RADIUS_SM,
@@ -25,8 +25,14 @@ class DepthCard(ctk.CTkFrame):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("fg_color", PANEL_COLOR)
         kwargs.setdefault("corner_radius", RADIUS_LG)
-        kwargs.setdefault("border_width", 0)
-        kwargs.setdefault("border_color", BORDER_COLOR)
+
+        # Keep cards border-light and lifted by default for a minimal shadow look.
+        if kwargs.get("border_width", 0) == 0:
+            kwargs["border_width"] = BORDER_WIDTH_HAIRLINE
+
+        if kwargs.get("border_color") in (None, BORDER_COLOR):
+            kwargs["border_color"] = SHADOW_EDGE_COLOR
+
         super().__init__(*args, **kwargs)
 
 
@@ -47,9 +53,6 @@ class StatCard(DepthCard):
         )
         self.pack(fill="x", pady=(0, 12))
         self.pack_propagate(False)
-
-        accent_bar = ctk.CTkFrame(self, fg_color=ACCENT_COLOR, height=3, corner_radius=0)
-        accent_bar.pack(fill="x", padx=0, pady=(0, 8), side="top")
 
         # center all content using a single inner frame
         inner = ctk.CTkFrame(self, fg_color="transparent")

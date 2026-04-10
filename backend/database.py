@@ -158,6 +158,59 @@ def _migrate_to_set_null_schema() -> bool:
     return True
 
 
+def _ensure_fk_indexes() -> None:
+    """Ensure common foreign-key lookup indexes exist for SQLite performance."""
+    with engine.begin() as connection:
+        if not _table_exists(connection, "programs") or not _table_exists(connection, "students"):
+            return
+
+        connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_programs_college_id ON programs(college_id)")
+        connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_students_program_id ON students(program_id)")
+        connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_colleges_code ON colleges(code)")
+        connection.exec_driver_sql("CREATE INDEX IF NOT EXISTS ix_programs_code ON programs(code)")
+
+
+def _ensure_student_integrity_triggers() -> None:
+    """Enforce student data domain rules for existing databases via triggers."""
+    with engine.begin() as connection:
+        if not _table_exists(connection, "students"):
+            return
+
+        connection.exec_driver_sql(
+            """
+            CREATE TRIGGER IF NOT EXISTS trg_students_validate_insert
+            BEFORE INSERT ON students
+            BEGIN
+                SELECT CASE
+                    WHEN NEW.id NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]'
+                        THEN RAISE(ABORT, 'students.id must follow YYYY-NNNN')
+                    WHEN NEW.year < 1 OR NEW.year > 5
+                        THEN RAISE(ABORT, 'students.year must be between 1 and 5')
+                    WHEN NEW.gender NOT IN ('Male', 'Female', 'Other')
+                        THEN RAISE(ABORT, 'students.gender must be Male, Female, or Other')
+                END;
+            END
+            """
+        )
+
+        connection.exec_driver_sql(
+            """
+            CREATE TRIGGER IF NOT EXISTS trg_students_validate_update
+            BEFORE UPDATE ON students
+            BEGIN
+                SELECT CASE
+                    WHEN NEW.id NOT GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9][0-9][0-9]'
+                        THEN RAISE(ABORT, 'students.id must follow YYYY-NNNN')
+                    WHEN NEW.year < 1 OR NEW.year > 5
+                        THEN RAISE(ABORT, 'students.year must be between 1 and 5')
+                    WHEN NEW.gender NOT IN ('Male', 'Female', 'Other')
+                        THEN RAISE(ABORT, 'students.gender must be Male, Female, or Other')
+                END;
+            END
+            """
+        )
+
+
 def get_session() -> Session:
     """Get a new database session. Should be used in a with statement."""
     return SessionLocal()
@@ -168,6 +221,8 @@ def init_db():
     Base.metadata.create_all(bind=engine)
     _migrate_to_set_null_schema()
     Base.metadata.create_all(bind=engine)
+    _ensure_fk_indexes()
+    _ensure_student_integrity_triggers()
 
 
 def drop_all():

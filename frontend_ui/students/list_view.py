@@ -1,0 +1,1243 @@
+"""Students list view canonical feature module."""
+import customtkinter as ctk
+import tkinter as tk
+import time
+from tkinter import ttk, filedialog, messagebox
+
+from config import (
+    FONT_MAIN, FONT_BOLD, BG_COLOR, PANEL_COLOR, ACCENT_COLOR,
+    TEXT_MUTED, BORDER_COLOR, COLOR_PALETTE, TEXT_PRIMARY,
+    BTN_PRIMARY_FG, BTN_PRIMARY_HOVER, DANGER_COLOR, DANGER_HOVER,
+    BTN_SEGMENT_FG, BTN_SEGMENT_HOVER,
+    ENTRY_BG, TABLE_ODD_BG, TABLE_EVEN_BG, TABLE_HOVER_BG,
+    CONTROL_HEIGHT_SM, CONTROL_HEIGHT_MD,
+    RADIUS_SM, RADIUS_MD, RADIUS_LG,
+    SPACE_SM, SPACE_MD, SPACE_LG,
+)
+from config import get_font
+from frontend_ui.ui import (
+    DepthCard,
+    PaginationControl,
+    setup_treeview_style,
+    placeholder_image,
+    get_icon,
+    SearchableComboBox,
+    StyledComboBox,
+    apply_window_icon,
+    animate_toplevel_in,
+    log_ui_timing,
+)
+from backend import validate_student
+from backend.csv_io import read_csv_rows, write_csv_rows
+from backend.services import ListPipelineService
+
+
+class StudentsView(ctk.CTkFrame):
+    def __init__(self, parent, controller):
+        super().__init__(parent, fg_color="transparent")
+        self.controller = controller
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
+        self.grid_columnconfigure(0, weight=1)
+        self.multi_edit_mode = False
+        self.sort_column = None
+        self.sort_reverse = False
+        self.column_names = {}  # store original column names
+        self.setup_ui()
+
+    def setup_ui(self):
+        # table Container
+        table_container = DepthCard(
+            self,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_LG,
+            border_width=0,
+            border_color=BORDER_COLOR,
+        )
+        table_container.grid(row=1, column=0, sticky="nsew")
+        
+        setup_treeview_style()
+        cols = ("ID", "First Name", "Last Name", "Gender", "Year", "Program", "College")
+        # create treeview without scrollbar and with fixed height of 12 rows
+        self.tree = ttk.Treeview(
+            table_container,
+            columns=cols,
+            show="tree headings",
+            style="Treeview",
+            height=12,
+            selectmode="extended",
+        )
+        self.tree.heading("#0", text="")
+        self.tree.column("#0", width=0, minwidth=0, stretch=False, anchor="center")
+        
+        # store original column names and add sort hint
+        for c in cols:
+            self.column_names[c] = c.upper()
+            self.tree.heading(c, text=c.upper() + " ⇅")
+        
+        # column widths and anchoring - center-align all content
+        self.tree.column("ID", width=70, anchor="center", stretch=False)
+        self.tree.column("First Name", width=130, anchor="center", stretch=False)
+        self.tree.column("Last Name", width=130, anchor="center", stretch=False)
+        self.tree.column("Gender", width=80, anchor="center", stretch=False)
+        self.tree.column("Year", width=70, anchor="center", stretch=False)
+        self.tree.column("Program", width=120, anchor="center", stretch=False)
+        self.tree.column("College", width=120, anchor="center", stretch=False)
+        
+        self.tree.pack(fill="both", expand=True, padx=SPACE_LG, pady=SPACE_LG)
+
+        # footer-style pagination controls pinned to the bottom of the view
+        footer = DepthCard(
+            self,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_MD,
+            border_width=0,
+            border_color=BORDER_COLOR,
+            height=62,
+        )
+        footer.grid(row=2, column=0, sticky="ew", pady=(SPACE_MD, 0))
+        footer.grid_propagate(False)
+        footer.grid_columnconfigure(0, weight=0)
+        footer.grid_columnconfigure(1, weight=1)
+
+        self.current_page = 1
+        self.page_size = 12
+        self._last_page_items = []
+        self._last_hover = None
+        self._page_render_after_id = None
+        self._page_anim_after_id = None
+        self.table_container = table_container
+        self.footer = footer
+
+        left_ctrl = ctk.CTkFrame(footer, fg_color="transparent")
+        left_ctrl.grid(row=0, column=0, sticky="w", padx=(SPACE_LG, SPACE_SM), pady=SPACE_SM)
+
+        self.pagination = PaginationControl(
+            left_ctrl,
+            on_page_change=self.goto_page,
+            slot_count=3,
+        )
+        self.pagination.pack(side="left")
+        
+        right_ctrl = ctk.CTkFrame(footer, fg_color="transparent")
+        right_ctrl.grid(row=0, column=1, sticky="e", padx=(SPACE_SM, SPACE_LG), pady=SPACE_SM)
+        
+        self.bulk_edit_btn = ctk.CTkButton(
+            right_ctrl,
+            text="Edit Selected",
+            width=120,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=RADIUS_SM,
+            border_width=0,
+            border_color=BORDER_COLOR,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
+            text_color="white",
+            font=get_font(12, True),
+            command=self.edit_selected_students,
+        )
+
+        self.bulk_delete_btn = ctk.CTkButton(
+            right_ctrl,
+            text="Delete Selected",
+            width=130,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=RADIUS_SM,
+            border_width=0,
+            border_color=BORDER_COLOR,
+            fg_color=DANGER_COLOR,
+            hover_color=DANGER_HOVER,
+            text_color="white",
+            font=get_font(12, True),
+            command=self.delete_selected_students,
+        )
+        # entry count label
+        self.entry_count_label = ctk.CTkLabel(right_ctrl, text="0 / 0", 
+                                             font=get_font(13), text_color=TEXT_MUTED)
+        self.entry_count_label.pack(side="left", padx=0)
+
+        self.csv_import_btn = ctk.CTkButton(
+            right_ctrl,
+            text="Import CSV",
+            width=96,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=RADIUS_SM,
+            border_width=0,
+            border_color=BORDER_COLOR,
+            fg_color=BTN_SEGMENT_FG,
+            hover_color=BTN_SEGMENT_HOVER,
+            text_color="white",
+            font=get_font(12, True),
+            command=self.import_csv,
+        )
+        self.csv_import_btn.pack(side="left", padx=(0, 8), before=self.entry_count_label)
+
+        self.csv_export_btn = ctk.CTkButton(
+            right_ctrl,
+            text="Export CSV",
+            width=96,
+            height=CONTROL_HEIGHT_SM,
+            corner_radius=RADIUS_SM,
+            border_width=0,
+            border_color=BORDER_COLOR,
+            fg_color=ACCENT_COLOR,
+            hover_color=BTN_PRIMARY_HOVER,
+            text_color="white",
+            font=get_font(12, True),
+            command=self.export_csv,
+        )
+        self.csv_export_btn.pack(side="left", padx=(0, 8), before=self.entry_count_label)
+
+        # bind configure event to update page size dynamically
+        table_container.bind('<Configure>', self._on_table_configure)
+        
+        self.tree.bind("<Button-1>", self.on_column_click)
+        self.tree.bind("<Motion>", self._on_tree_motion)
+        self.tree.bind("<Leave>", self._on_tree_leave)
+        self.tree.bind("<ButtonRelease-1>", self.on_row_click)
+        self.tree.bind("<Double-1>", self.on_row_double_click)
+        self.tree.bind("<<TreeviewSelect>>", lambda _event: self._refresh_checkmarks())
+        self.tree.tag_configure('odd', background=TABLE_ODD_BG)
+        self.tree.tag_configure('even', background=TABLE_EVEN_BG)
+        self.tree.tag_configure('hover', background=TABLE_HOVER_BG, foreground="#ffffff")
+        
+        # button-style tags for action columns
+        self.tree.tag_configure('action_button', foreground=ACCENT_COLOR, font=get_font(12, True), background=PANEL_COLOR)
+        self.tree.tag_configure('action_button_delete', foreground=DANGER_COLOR, font=get_font(12, True), background=PANEL_COLOR)
+        
+        self.refresh_table()
+
+    def refresh_sidebar(self):
+        """Sidebar removed - table now takes full width."""
+        pass
+
+    def _refresh_all_sidebars(self):
+        """Sidebar removed - no longer needed."""
+        pass
+
+    def refresh_table(self):
+        rows = ListPipelineService.student_rows(self.controller.students, self.controller.programs)
+
+        self._last_page_items = rows
+        self.current_page = min(max(1, self.current_page), max(1, (len(rows) + self.page_size - 1) // self.page_size))
+        self._render_page()
+        self._last_hover = None
+        self._last_hover = None
+
+    def _animate_page_flip(self):
+        if self._page_anim_after_id:
+            try:
+                self.after_cancel(self._page_anim_after_id)
+            except Exception:
+                pass
+            self._page_anim_after_id = None
+
+        try:
+            self.table_container.configure(fg_color="#1a1329")
+        except Exception:
+            return
+
+        def _restore():
+            self._page_anim_after_id = None
+            try:
+                self.table_container.configure(fg_color=PANEL_COLOR)
+            except Exception:
+                pass
+
+        self._page_anim_after_id = self.after(85, _restore)
+
+    def _request_page_render(self):
+        if self._page_render_after_id:
+            try:
+                self.after_cancel(self._page_render_after_id)
+            except Exception:
+                pass
+            self._page_render_after_id = None
+
+        self._page_render_after_id = self.after(18, self._perform_page_render)
+
+    def _perform_page_render(self):
+        self._page_render_after_id = None
+        self._render_page()
+        self._animate_page_flip()
+
+    def _render_page(self):
+        started_at = time.perf_counter()
+        total = len(self._last_page_items)
+        per = self.page_size
+        total_pages = max(1, (total + per - 1) // per)
+        self.current_page = min(self.current_page, total_pages)
+        start = (self.current_page - 1) * per
+        end = min(start + per, total)
+        page_rows = self._last_page_items[start:end]
+
+        tree_items = list(self.tree.get_children())
+        while len(tree_items) < len(page_rows):
+            tree_items.append(self.tree.insert("", "end"))
+
+        for idx, row in enumerate(page_rows):
+            tag = 'even' if idx % 2 == 0 else 'odd'
+            self.tree.item(
+                tree_items[idx],
+                text=("☐" if self.multi_edit_mode else ""),
+                values=row,
+                tags=(tag,),
+            )
+
+        for stale in tree_items[len(page_rows):]:
+            self.tree.delete(stale)
+
+        self._refresh_checkmarks()
+        
+        # update entry count - show range (e.g., "Showing 1-12 of 100 entries")
+        if total > 0:
+            display_text = f"{start + 1}-{end} / {total}"
+        else:
+            display_text = "0 / 0"
+        self.entry_count_label.configure(text=display_text)
+        
+        if hasattr(self, "pagination"):
+            self.pagination.update(self.current_page, total_pages)
+        log_ui_timing("table.render.students", started_at, warn_ms=65)
+    
+    def goto_page(self, page):
+        total_pages = max(1, (len(self._last_page_items) + self.page_size - 1) // self.page_size)
+        self.current_page = min(max(1, int(page)), total_pages)
+        self._request_page_render()
+
+    def change_page(self, delta):
+        total_pages = max(1, (len(self._last_page_items) + self.page_size - 1) // self.page_size)
+        self.current_page = min(max(1, self.current_page + delta), total_pages)
+        self._request_page_render()
+
+    def go_to_page(self):
+        """Jump to a specific page number using the shared pagination control."""
+        if hasattr(self, "pagination"):
+            self.pagination.go_from_entry()
+
+    def _on_table_configure(self, event):
+        # adjust column widths based on available width with proportions
+        available_width = max(self.table_container.winfo_width() - 20, 200)
+        if available_width < 100:  # skip if window is too small
+            return
+        cols = ["ID", "First Name", "Last Name", "Gender", "Year", "Program", "College"]
+        props = [0.10, 0.18, 0.19, 0.11, 0.09, 0.17, 0.16]
+        for i, col in enumerate(cols):
+            self.tree.column(col, width=max(int(available_width * props[i]), 50))
+        
+        # get actual available height and calculate how many rows can fit
+        available_height = self.table_container.winfo_height()
+        if available_height < 100:  # skip if window is too small
+            return
+        # account for tree header and table card vertical padding
+        reserved_height = 20 + (SPACE_LG * 2)
+        usable_height = max(available_height - reserved_height, 50)
+        row_height = 46  # height of each row (matches treeview rowheight in setup_treeview_style)
+        new_page_size = max(8, usable_height // row_height)  # show at least 8 rows
+        
+        # update treeview height to match page size
+        self.tree.configure(height=new_page_size)
+        
+        if new_page_size != self.page_size:
+            old_page = self.current_page
+            self.page_size = new_page_size
+            total_pages = max(1, (len(self._last_page_items) + self.page_size - 1) // self.page_size)
+            self.current_page = min(old_page, total_pages)
+            self._render_page()
+
+    def _update_sidebar_heights(self):
+        """Sidebar removed - no longer needed."""
+        pass
+
+    def _on_tree_motion(self, event):
+        region = self.tree.identify_region(event.x, event.y)
+        # change cursor to hand when hovering over sortable headings
+        if region == "heading":
+            self.tree.configure(cursor="hand2")
+            # clear any row hover
+            if getattr(self, '_last_hover', None):
+                prev_row = self._last_hover
+                if prev_row in self.tree.get_children():
+                    items = self.tree.get_children()
+                    if prev_row in items:
+                        idx = items.index(prev_row)
+                        tag = 'even' if idx % 2 == 0 else 'odd'
+                        self.tree.item(prev_row, tags=(tag,))
+                self._last_hover = None
+            return
+        else:
+            self.tree.configure(cursor="")
+        
+        row = self.tree.identify_row(event.y)
+        if not row:
+            return
+        if getattr(self, '_last_hover', None) == row:
+            return
+        if getattr(self, '_last_hover', None):
+            prev_row = self._last_hover
+            # check if the previous row still exists
+            if prev_row in self.tree.get_children():
+                items = self.tree.get_children()
+                if prev_row in items:
+                    idx = list(items).index(prev_row)
+                    tag = 'even' if idx % 2 == 0 else 'odd'
+                    self.tree.item(prev_row, tags=(tag,))
+        # set hover tag as the only tag for this row
+        self.tree.item(row, tags=('hover',))
+        self._last_hover = row
+
+    def _on_tree_leave(self, event):
+        self.tree.configure(cursor="")
+        if getattr(self, '_last_hover', None):
+            prev_row = self._last_hover
+            # check if the row still exists
+            if prev_row in self.tree.get_children():
+                # restore the striping tag
+                items = self.tree.get_children()
+                if prev_row in items:
+                    idx = items.index(prev_row)
+                    tag = 'even' if idx % 2 == 0 else 'odd'
+                    self.tree.item(prev_row, tags=(tag,))
+            self._last_hover = None
+
+    def on_row_click(self, event):
+        if not self.multi_edit_mode:
+            return
+        region = self.tree.identify_region(event.x, event.y)
+        if region in ("tree", "cell"):
+            return "break"
+
+    def on_row_double_click(self, event):
+        region = self.tree.identify_region(event.x, event.y)
+        if self.multi_edit_mode and region in ("tree", "cell"):
+            return
+        if region not in ('cell', 'tree'):
+            return
+        row = self.tree.identify_row(event.y)
+        if not row:
+            return
+        row_data = self.tree.item(row).get('values', [])
+        if not row_data:
+            return
+        self._show_student_profile(row_data[0])
+
+    def filter_table(self, query):
+        self.apply_filters(query=query, advanced_filters=None)
+
+    def apply_filters(self, query: str = "", advanced_filters=None):
+        """Apply quick-search and advanced filters with AND semantics."""
+        base_rows = ListPipelineService.student_rows(self.controller.students, self.controller.programs)
+        rows = ListPipelineService.filter_students(base_rows, query=query, advanced_filters=advanced_filters)
+
+        self._last_page_items = rows
+        self.current_page = 1
+        self._render_page()
+
+    def on_column_click(self, event):
+        region = self.tree.identify_region(event.x, event.y)
+        if self.multi_edit_mode and region in ("tree", "cell"):
+            item = self.tree.identify_row(event.y)
+            if item:
+                if item in self.tree.selection():
+                    self.tree.selection_remove(item)
+                else:
+                    self.tree.selection_add(item)
+                self._refresh_checkmarks()
+            return "break"
+
+        if region == "heading":
+            col = self.tree.identify_column(event.x)
+            if col == "#0":
+                if self.multi_edit_mode:
+                    visible = self.tree.get_children()
+                    if visible and all(item in self.tree.selection() for item in visible):
+                        self.tree.selection_remove(*visible)
+                    else:
+                        self.tree.selection_add(*visible)
+                    self._refresh_checkmarks()
+                return "break"
+            try:
+                idx = int(col.replace('#', '')) - 1
+                col_id = self.tree['columns'][idx]
+            except Exception:
+                col_id = self.tree.heading(col, "text")
+            
+            # restore sort hint on previous sort column
+            if self.sort_column and self.sort_column != col_id:
+                self.tree.heading(self.sort_column, text=self.column_names.get(self.sort_column, self.sort_column) + " ⇅")
+            
+            if self.sort_column == col_id:
+                self.sort_reverse = not self.sort_reverse
+            else:
+                self.sort_column = col_id
+                self.sort_reverse = False
+            
+            self.update_sort_arrow()
+            self.sort_table()
+    
+    def update_sort_arrow(self):
+        """Update column heading to show sort arrow indicator."""
+        if not self.sort_column:
+            return
+        
+        # get the original column name
+        col_name = self.column_names.get(self.sort_column, self.sort_column)
+        arrow = " ▼" if self.sort_reverse else " ▲"
+        self.tree.heading(self.sort_column, text=col_name + arrow)
+    
+    def sort_table(self):
+        if not self.sort_column:
+            return
+
+        self._last_page_items = ListPipelineService.sort_rows(
+            self._last_page_items,
+            self.tree['columns'],
+            self.sort_column,
+            reverse=self.sort_reverse,
+        )
+        
+        # re-render the current page
+        self._render_page()
+    
+    @staticmethod
+    def try_numeric(val):
+        try:
+            return float(val)
+        except ValueError:
+            return val
+
+    def _show_student_profile(self, student_id):
+        """Show student profile in a new window."""
+        student = next((s for s in self.controller.students if s['id'] == student_id), None)
+        if not student:
+            self.controller.show_custom_dialog("Error", "Student not found", dialog_type="error")
+            return
+
+        profile_window = ctk.CTkToplevel(self)
+        profile_window.title(f"Student Profile: {student.get('firstname')} {student.get('lastname')}")
+        apply_window_icon(profile_window)
+        profile_window.geometry("750x600")
+        profile_window.configure(fg_color=BG_COLOR)
+        profile_window.attributes('-topmost', True)
+        profile_window.grab_set()
+        profile_window.focus_force()
+
+        profile_window.update_idletasks()
+        x = (profile_window.winfo_screenwidth() // 2) - (profile_window.winfo_width() // 2)
+        y = (profile_window.winfo_screenheight() // 2) - (profile_window.winfo_height() // 2)
+        profile_window.geometry(f"+{x}+{y}")
+
+        container = ctk.CTkFrame(profile_window, fg_color="transparent")
+        container.pack(fill="both", expand=True, padx=20, pady=20)
+
+        # header with avatar and name
+        header = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=0, border_color=BORDER_COLOR)
+        header.pack(fill="x", pady=(0, 15))
+
+        header_inner = ctk.CTkFrame(header, fg_color="transparent")
+        header_inner.pack(fill="x", padx=20, pady=16)
+
+        avatar = ctk.CTkFrame(header_inner, width=72, height=72, fg_color="transparent", corner_radius=RADIUS_SM)
+        avatar.pack(side="left", padx=(0, 16))
+        avatar.pack_propagate(False)
+        ctk.CTkLabel(avatar, text="\U0001f464", font=get_font(32)).pack(expand=True)
+
+        name = f"{student.get('firstname', '')} {student.get('lastname', '')}"
+        text_frame = ctk.CTkFrame(header_inner, fg_color="transparent")
+        text_frame.pack(side="left", fill="x", expand=True)
+        ctk.CTkLabel(text_frame, text=name, font=get_font(16, True), wraplength=550, justify="left", anchor="w").pack(fill="x", anchor="w")
+        ctk.CTkLabel(text_frame, text=f"ID: {student.get('id', '')}", text_color=TEXT_MUTED, font=get_font(13), anchor="w").pack(fill="x", anchor="w", pady=(4, 0))
+
+        # action buttons frame - packed with side="bottom" first to guarantee visibility
+        btn_frame = ctk.CTkFrame(container, fg_color="transparent")
+        btn_frame.pack(side="bottom", fill="x", pady=(15, 0))
+
+        # info card with scrollable content
+        info_card = DepthCard(container, fg_color=PANEL_COLOR, corner_radius=RADIUS_MD, border_width=0, border_color=BORDER_COLOR)
+        info_card.pack(fill="both", expand=True)
+
+        info_scroll = ctk.CTkScrollableFrame(info_card, fg_color="transparent")
+        info_scroll.pack(fill="both", expand=True, padx=15, pady=15)
+
+        # information grid
+        def add_info_row(label, value):
+            row = ctk.CTkFrame(info_scroll, fg_color="transparent")
+            row.pack(fill="x", pady=8)
+            lbl = ctk.CTkLabel(row, text=label, font=get_font(14, True), text_color=TEXT_MUTED, width=160, anchor="w")
+            lbl.pack(side="left", anchor="w")
+            val = ctk.CTkLabel(row, text=value, font=get_font(15), wraplength=450, justify="left", anchor="w")
+            val.pack(side="left", padx=(12, 0), fill="x", expand=True, anchor="w")
+
+        add_info_row("First Name:", student.get('firstname', 'N/A'))
+        add_info_row("Last Name:", student.get('lastname', 'N/A'))
+        add_info_row("Gender:", student.get('gender', 'N/A'))
+        add_info_row("Year Level:", student.get('year', 'N/A'))
+        add_info_row("Program:", student.get('program', 'N/A'))
+        
+        program_name = next((p['name'] for p in self.controller.programs if p['code'] == student.get('program')), 'N/A')
+        college_name = next((c['name'] for c in self.controller.colleges if c['code'] == next((p['college'] for p in self.controller.programs if p['code'] == student.get('program')), '')), 'N/A')
+        add_info_row("College:", college_name)
+
+        # action buttons - only show if authenticated
+
+        def _edit():
+            profile_window.destroy()
+            self._edit_student(student_id)
+
+        def _delete():
+            if self.controller.show_custom_dialog("Confirm Delete", f"Delete student {name}?", dialog_type="yesno"):
+                profile_window.destroy()
+                self._delete_student_by_id(student_id)
+
+        # only show edit/delete buttons if user is logged in
+        if self.controller.logged_in:
+            ctk.CTkButton(btn_frame, text="Edit", command=_edit, fg_color=ACCENT_COLOR, text_color="white", font=FONT_BOLD, corner_radius=RADIUS_SM, border_width=0, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(0, 5))
+            ctk.CTkButton(btn_frame, text="Delete", command=_delete, fg_color=DANGER_COLOR, text_color="white", font=FONT_BOLD, corner_radius=RADIUS_SM, border_width=0, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(5, 0))
+        else:
+            # show message prompting login
+            login_msg = ctk.CTkLabel(btn_frame, text="🔒 Log in to edit or delete", font=get_font(13), text_color=TEXT_MUTED)
+            login_msg.pack(fill="x", pady=10)
+
+        animate_toplevel_in(profile_window, x=x, y=y)
+
+    def _edit_student(self, student_id):
+        """Edit student in a modal window."""
+        # check authentication
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "You must log in to edit students.")
+            return
+        
+        student = next((s for s in self.controller.students if s['id'] == student_id), None)
+        if not student:
+            self.controller.show_custom_dialog("Error", "Student not found", dialog_type="error")
+            return
+
+        edit_window = ctk.CTkToplevel(self)
+        edit_window.title("Edit Student")
+        apply_window_icon(edit_window)
+        edit_window.geometry("520x480")
+        edit_window.configure(fg_color=BG_COLOR)
+        edit_window.attributes('-topmost', True)
+        edit_window.grab_set()
+        edit_window.focus_force()
+
+        edit_window.update_idletasks()
+        x = (edit_window.winfo_screenwidth() // 2) - (edit_window.winfo_width() // 2)
+        y = (edit_window.winfo_screenheight() // 2) - (edit_window.winfo_height() // 2)
+        edit_window.geometry(f"+{x}+{y}")
+
+        form_frame = ctk.CTkScrollableFrame(edit_window, fg_color="transparent")
+        form_frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(form_frame, text="Edit Student Information", font=get_font(16, True)).pack(pady=(0, 20))
+
+        ctk.CTkLabel(form_frame, text="Student ID", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        id_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
+        id_entry.insert(0, student['id'])
+        id_entry.configure(state="disabled")
+        id_entry.pack(fill="x", pady=(0, 15))
+
+        ctk.CTkLabel(form_frame, text="First Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        fname_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
+        fname_entry.insert(0, student['firstname'])
+        fname_entry.pack(fill="x", pady=(0, 15))
+
+        ctk.CTkLabel(form_frame, text="Last Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        lname_entry = ctk.CTkEntry(form_frame, height=CONTROL_HEIGHT_MD)
+        lname_entry.insert(0, student['lastname'])
+        lname_entry.pack(fill="x", pady=(0, 15))
+
+        ctk.CTkLabel(form_frame, text="Gender", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        gender_combo = StyledComboBox(form_frame, ["Male", "Female", "Other"])
+        gender_combo.set(student['gender'])
+        gender_combo.pack(fill="x", pady=(0, 15))
+
+        ctk.CTkLabel(form_frame, text="Year Level", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        year_combo = StyledComboBox(form_frame, ["1", "2", "3", "4", "5"])
+        year_combo.set(student['year'])
+        year_combo.pack(fill="x", pady=(0, 15))
+
+        ctk.CTkLabel(form_frame, text="Program", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        program_values = [p['code'] for p in self.controller.programs]
+        program_widget = SearchableComboBox(form_frame, program_values)
+        program_widget.set(student['program'])
+        program_widget.pack(fill="x", pady=(0, 20))
+
+        def validate_form():
+            """Validate form inputs and return (is_valid, error_message)."""
+            fname = fname_entry.get().strip()
+            lname = lname_entry.get().strip()
+            gender = gender_combo.get()
+            year = year_combo.get()
+            program = program_widget.get()
+
+            if not fname:
+                return False, "First Name is required"
+            if not lname:
+                return False, "Last Name is required"
+            if not gender or gender == "Select Gender":
+                return False, "Gender must be selected"
+            if not year or year == "Select Year":
+                return False, "Year Level must be selected"
+            if not program:
+                return False, "Program must be selected"
+
+            if not fname.replace(" ", "").isalpha():
+                return False, "First Name must contain only letters and spaces"
+            if not lname.replace(" ", "").isalpha():
+                return False, "Last Name must contain only letters and spaces"
+
+            return True, ""
+
+        def save():
+            is_valid, error_msg = validate_form()
+            if not is_valid:
+                self.controller.show_custom_dialog("Validation Error", error_msg, dialog_type="error")
+                return
+
+            updates = {
+                'firstname': fname_entry.get().strip().title(),
+                'lastname': lname_entry.get().strip().title(),
+                'gender': gender_combo.get(),
+                'year': year_combo.get(),
+                'program': program_widget.get(),
+            }
+
+            candidate = {'id': student_id, **updates}
+            ok, msg = validate_student(candidate)
+            if not ok:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+
+            success, msg = self.controller.update_student(student_id, updates)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+
+            edit_window.destroy()
+            self.refresh_table()
+            self.controller.show_custom_dialog("Success", "Student updated successfully!")
+
+        def delete():
+            if self.controller.show_custom_dialog("Confirm Delete", f"Delete {student['id']}?", dialog_type="yesno"):
+                success, msg = self.controller.delete_student(student_id)
+                if not success:
+                    self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                    return
+                edit_window.destroy()
+                self.refresh_table()
+                self.controller.show_custom_dialog("Success", msg)
+
+        btn_frame = ctk.CTkFrame(form_frame, fg_color="transparent")
+        btn_frame.pack(fill="x", pady=(10, 0))
+
+        ctk.CTkButton(btn_frame, text="Save Changes", command=save, height=CONTROL_HEIGHT_MD, corner_radius=RADIUS_SM, border_width=0, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(0, 5))
+        ctk.CTkButton(btn_frame, text="Delete", command=delete, height=CONTROL_HEIGHT_MD, corner_radius=RADIUS_SM, border_width=0, fg_color=DANGER_COLOR, hover_color=DANGER_HOVER, font=FONT_BOLD).pack(side="left", fill="x", expand=True, padx=(5, 0))
+
+        animate_toplevel_in(edit_window, x=x, y=y)
+
+    def _delete_student_by_id(self, student_id):
+        """Delete a student by ID."""
+        # check authentication
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "You must log in to delete students.")
+            return
+        
+        student = next((s for s in self.controller.students if s['id'] == student_id), None)
+        if not student:
+            self.controller.show_custom_dialog("Error", "Student not found", dialog_type="error")
+            return
+
+        if self.controller.show_custom_dialog("Confirm Delete", f"Delete student {student_id}?", dialog_type="yesno"):
+            success, msg = self.controller.delete_student(student_id)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+            self.refresh_table()
+            self.controller.show_custom_dialog("Success", msg)
+
+    def delete_selected_students(self):
+        """Delete multiple selected students from the table."""
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "You must log in to delete students.")
+            return
+        if not self.multi_edit_mode:
+            self.controller.show_custom_dialog("Mode Required", "Enable Multi-Edit mode first.", dialog_type="warning")
+            return
+
+        selections = self.tree.selection()
+        if not selections:
+            self.controller.show_custom_dialog("No Selection", "Select one or more students first.", dialog_type="warning")
+            return
+
+        student_ids = []
+        for item in selections:
+            row = self.tree.item(item).get('values', [])
+            if row:
+                student_ids.append(str(row[0]))
+
+        if not student_ids:
+            self.controller.show_custom_dialog("No Selection", "No valid student rows selected.", dialog_type="warning")
+            return
+
+        if not self.controller.show_custom_dialog(
+            "Confirm Bulk Delete",
+            f"Delete {len(student_ids)} selected student(s)?\nThis action cannot be undone.",
+            dialog_type="yesno",
+        ):
+            return
+
+        success_count = 0
+        failures = []
+        for student_id in student_ids:
+            success, msg = self.controller.delete_student(student_id)
+            if success:
+                success_count += 1
+            else:
+                failures.append(f"{student_id}: {msg}")
+
+        self.refresh_table()
+
+        if failures:
+            preview = "\n".join(failures[:5])
+            more = "" if len(failures) <= 5 else f"\n...and {len(failures) - 5} more"
+            self.controller.show_custom_dialog(
+                "Bulk Delete Complete",
+                f"Deleted {success_count}/{len(student_ids)} student(s).\n\nFailed:\n{preview}{more}",
+                dialog_type="warning",
+            )
+        else:
+            self.controller.show_custom_dialog("Success", f"Deleted {success_count} student(s) successfully.")
+
+    def edit_selected_students(self):
+        """Bulk edit selected students (safe fields only)."""
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "You must log in to edit students.")
+            return
+        if not self.multi_edit_mode:
+            self.controller.show_custom_dialog("Mode Required", "Enable Multi-Edit mode first.", dialog_type="warning")
+            return
+
+        selections = self.tree.selection()
+        if not selections:
+            self.controller.show_custom_dialog("No Selection", "Select one or more students first.", dialog_type="warning")
+            return
+
+        student_ids = []
+        for item in selections:
+            row = self.tree.item(item).get('values', [])
+            if row:
+                student_ids.append(str(row[0]))
+
+        if not student_ids:
+            self.controller.show_custom_dialog("No Selection", "No valid student rows selected.", dialog_type="warning")
+            return
+
+        modal = ctk.CTkToplevel(self)
+        modal.title("Bulk Edit Students")
+        apply_window_icon(modal)
+        modal.geometry("480x340")
+        modal.configure(fg_color=BG_COLOR)
+        modal.attributes('-topmost', True)
+        modal.grab_set()
+        modal.focus_force()
+
+        modal.update_idletasks()
+        x = (modal.winfo_screenwidth() // 2) - (modal.winfo_width() // 2)
+        y = (modal.winfo_screenheight() // 2) - (modal.winfo_height() // 2)
+        modal.geometry(f"+{x}+{y}")
+
+        frame = ctk.CTkFrame(modal, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=20, pady=20)
+
+        ctk.CTkLabel(frame, text=f"Bulk Edit {len(student_ids)} Student(s)", font=get_font(16, True)).pack(anchor="w", pady=(0, 12))
+
+        ctk.CTkLabel(frame, text="Year Level", font=FONT_BOLD).pack(anchor="w")
+        year_widget = StyledComboBox(frame, ["(No change)", "1", "2", "3", "4", "5"])
+        year_widget.set("(No change)")
+        year_widget.pack(fill="x", pady=(0, 12))
+
+        ctk.CTkLabel(frame, text="Program", font=FONT_BOLD).pack(anchor="w")
+        program_values = [p['code'] for p in self.controller.programs]
+        program_widget = SearchableComboBox(frame, program_values, placeholder="(No change)")
+        program_widget.pack(fill="x", pady=(0, 16))
+
+        def save_bulk():
+            updates = {}
+            selected_year = year_widget.get().strip()
+            selected_program = program_widget.get().strip()
+
+            if selected_year and selected_year != "(No change)":
+                updates['year'] = selected_year
+            if selected_program:
+                updates['program'] = selected_program
+
+            if not updates:
+                self.controller.show_custom_dialog("No Changes", "Pick at least one field to update.", dialog_type="warning")
+                return
+
+            preview_lines = []
+            if 'year' in updates:
+                preview_lines.append(f"- Set Year to {updates['year']}")
+            if 'program' in updates:
+                preview_lines.append(f"- Set Program to {updates['program']}")
+
+            if not self.controller.show_custom_dialog(
+                "Confirm Bulk Edit",
+                f"Apply these changes to {len(student_ids)} student(s)?\n\n" + "\n".join(preview_lines),
+                dialog_type="yesno",
+            ):
+                return
+
+            success_count = 0
+            failures = []
+            for student_id in student_ids:
+                success, msg = self.controller.update_student(student_id, dict(updates))
+                if success:
+                    success_count += 1
+                else:
+                    failures.append(f"{student_id}: {msg}")
+
+            self.refresh_table()
+            modal.destroy()
+
+            if failures:
+                preview = "\n".join(failures[:5])
+                more = "" if len(failures) <= 5 else f"\n...and {len(failures) - 5} more"
+                self.controller.show_custom_dialog(
+                    "Bulk Edit Complete",
+                    f"Updated {success_count}/{len(student_ids)} student(s).\n\nFailed:\n{preview}{more}",
+                    dialog_type="warning",
+                )
+            else:
+                self.controller.show_custom_dialog("Success", f"Updated {success_count} student(s) successfully.")
+
+        btn_row = ctk.CTkFrame(frame, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(6, 0))
+        ctk.CTkButton(btn_row, text="Apply Changes", command=save_bulk, fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, corner_radius=RADIUS_SM, border_width=0, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER, text_color="white", font=FONT_BOLD, corner_radius=RADIUS_SM, border_width=0, height=CONTROL_HEIGHT_MD).pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        animate_toplevel_in(modal, x=x, y=y)
+
+    def _refresh_checkmarks(self):
+        """Render checkbox glyphs in the left tree column for multi-edit mode."""
+        for item in self.tree.get_children():
+            if not self.multi_edit_mode:
+                self.tree.item(item, text="")
+            else:
+                self.tree.item(item, text="☑" if item in self.tree.selection() else "☐")
+
+    def set_multi_edit_mode(self, enabled: bool):
+        """Enable or disable multi-edit controls and checkbox column."""
+        self.multi_edit_mode = bool(enabled and self.controller.logged_in)
+        self.tree.configure(selectmode=("extended" if self.multi_edit_mode else "browse"))
+        self.tree.heading("#0", text=("✓" if self.multi_edit_mode else ""))
+        self.tree.column("#0", width=(38 if self.multi_edit_mode else 0), minwidth=0, stretch=False)
+        self.tree.selection_remove(*self.tree.selection())
+
+        if self.multi_edit_mode:
+            if not self.bulk_edit_btn.winfo_manager():
+                self.bulk_edit_btn.pack(side="left", padx=(0, 8), before=self.csv_import_btn)
+            if not self.bulk_delete_btn.winfo_manager():
+                self.bulk_delete_btn.pack(side="left", padx=(0, 8), before=self.csv_import_btn)
+        else:
+            self.bulk_edit_btn.pack_forget()
+            self.bulk_delete_btn.pack_forget()
+
+        self._refresh_checkmarks()
+
+    @staticmethod
+    def _csv_pick(row: dict, *aliases: str) -> str:
+        if not isinstance(row, dict):
+            return ""
+
+        lowered = {
+            str(key or "").strip().lower(): str(value or "").strip()
+            for key, value in row.items()
+        }
+        for alias in aliases:
+            value = lowered.get(str(alias).strip().lower(), "")
+            if value:
+                return value
+        return ""
+
+    def _selected_student_ids(self) -> set[str]:
+        selected = set()
+        for item in self.tree.selection():
+            values = self.tree.item(item).get("values", [])
+            if values:
+                selected.add(str(values[0]).strip())
+        return selected
+
+    def export_csv(self):
+        selected_ids = self._selected_student_ids() if self.multi_edit_mode else set()
+        students = self.controller.students
+        if selected_ids:
+            students = [s for s in students if str(s.get("id", "")).strip() in selected_ids]
+
+        rows = [
+            {
+                "ID": str(student.get("id", "")).strip(),
+                "First Name": str(student.get("firstname", "")).strip(),
+                "Last Name": str(student.get("lastname", "")).strip(),
+                "Course": str(student.get("program", "")).strip(),
+                "Year": str(student.get("year", "")).strip(),
+                "Gender": str(student.get("gender", "")).strip(),
+            }
+            for student in students
+        ]
+
+        if not rows:
+            self.controller.show_custom_dialog("Export CSV", "No student rows available to export.", dialog_type="warning")
+            return
+
+        file_path = filedialog.asksaveasfilename(
+            parent=self,
+            title="Export Students CSV",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv")],
+            initialfile=f"students_{time.strftime('%Y%m%d_%H%M%S')}.csv",
+        )
+        if not file_path:
+            return
+
+        try:
+            written = write_csv_rows(
+                file_path,
+                ["ID", "First Name", "Last Name", "Course", "Year", "Gender"],
+                rows,
+            )
+            self.controller.show_custom_dialog("Export CSV", f"Exported {written} student row(s).")
+        except Exception as exc:
+            self.controller.show_custom_dialog("Export Error", f"Could not export CSV: {exc}", dialog_type="error")
+
+    def import_csv(self):
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "Please log in to import students.", dialog_type="error")
+            return
+
+        file_path = filedialog.askopenfilename(
+            parent=self,
+            title="Import Students CSV",
+            filetypes=[("CSV files", "*.csv")],
+        )
+        if not file_path:
+            return
+
+        try:
+            raw_rows, _fieldnames = read_csv_rows(file_path)
+        except Exception as exc:
+            self.controller.show_custom_dialog("Import Error", f"Could not read CSV: {exc}", dialog_type="error")
+            return
+
+        if not raw_rows:
+            self.controller.show_custom_dialog("Import CSV", "CSV contains no rows to import.", dialog_type="warning")
+            return
+
+        records = []
+        for row in raw_rows:
+            records.append(
+                {
+                    "id": self._csv_pick(row, "id", "student id"),
+                    "firstname": self._csv_pick(row, "firstname", "first name"),
+                    "lastname": self._csv_pick(row, "lastname", "last name"),
+                    "gender": self._csv_pick(row, "gender"),
+                    "year": self._csv_pick(row, "year", "year level"),
+                    "program": self._csv_pick(row, "program", "course"),
+                }
+            )
+
+        existing_ids = {str(student.get("id", "")).strip() for student in self.controller.students}
+        duplicate_count = sum(1 for record in records if record.get("id") in existing_ids)
+
+        overwrite_existing = False
+        if duplicate_count:
+            decision = messagebox.askyesnocancel(
+                "Duplicate Students Found",
+                (
+                    f"Found {duplicate_count} student ID(s) that already exist.\n\n"
+                    "Yes: overwrite existing records\n"
+                    "No: skip duplicate IDs\n"
+                    "Cancel: abort import"
+                ),
+                parent=self.winfo_toplevel(),
+            )
+            if decision is None:
+                return
+            overwrite_existing = bool(decision)
+
+        success, summary = self.controller.bulk_upsert_students(records, overwrite_existing=overwrite_existing)
+        if not success:
+            fatal = summary.get("fatal_error", "Unknown error")
+            self.controller.show_custom_dialog("Import Error", f"Import failed: {fatal}", dialog_type="error")
+            return
+
+        self.refresh_table()
+
+        msg = (
+            f"Created: {summary.get('created', 0)}\n"
+            f"Updated: {summary.get('updated', 0)}\n"
+            f"Skipped: {summary.get('skipped', 0)}\n"
+            f"Failed: {summary.get('failed', 0)}"
+        )
+        errors = summary.get("errors", [])
+        if errors:
+            msg += "\n\nSample errors:\n" + "\n".join(errors[:5])
+
+        self.controller.show_custom_dialog("Import Students Complete", msg)
+
+    def delete_student(self):
+        """Legacy method - use _delete_student_by_id instead."""
+        pass
+
+    def add_student(self):
+        # check authentication
+        if not self.controller.logged_in:
+            self.controller.show_custom_dialog("Access Denied", "You must log in to add students.")
+            return
+        
+        modal = ctk.CTkToplevel(self)
+        modal.title("Add Student")
+        apply_window_icon(modal)
+        screen_height = modal.winfo_screenheight()
+        height = min(600, int(screen_height * 0.7))
+        modal.geometry(f"500x{height}")
+        modal.configure(fg_color=BG_COLOR)
+        modal.attributes('-topmost', True)
+        modal.grab_set()
+        modal.focus_force()
+        
+        modal.update_idletasks()
+        x = (modal.winfo_screenwidth() // 2) - (modal.winfo_width() // 2)
+        y = (modal.winfo_screenheight() // 2) - (modal.winfo_height() // 2)
+        modal.geometry(f"500x{height}+{x}+{y}")
+        
+        form_frame = ctk.CTkScrollableFrame(modal, fg_color="transparent")
+        form_frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        ctk.CTkLabel(form_frame, text="New Student Enrollment", font=get_font(16, True)).pack(pady=(0, 20))
+        
+        ctk.CTkLabel(form_frame, text="Student ID", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        id_entry = ctk.CTkEntry(form_frame, placeholder_text="e.g., 2024-0001", height=CONTROL_HEIGHT_MD)
+        id_entry.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(form_frame, text="First Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        fname_entry = ctk.CTkEntry(form_frame, placeholder_text="First Name", height=CONTROL_HEIGHT_MD)
+        fname_entry.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(form_frame, text="Last Name", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        lname_entry = ctk.CTkEntry(form_frame, placeholder_text="Last Name", height=CONTROL_HEIGHT_MD)
+        lname_entry.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(form_frame, text="Gender", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        gender_combo = StyledComboBox(form_frame, ["Male", "Female", "Other"])
+        gender_combo.set("Male")
+        gender_combo.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(form_frame, text="Year Level", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        year_combo = StyledComboBox(form_frame, ["1", "2", "3", "4", "5"])
+        year_combo.set("1")
+        year_combo.pack(fill="x", pady=(0, 15))
+        
+        ctk.CTkLabel(form_frame, text="Program", font=FONT_BOLD).pack(anchor="w", pady=(10, 0))
+        program_values = [p['code'] for p in self.controller.programs]
+        program_widget = SearchableComboBox(form_frame, program_values)
+        program_widget.pack(fill="x", pady=(0, 20))
+        
+        def validate_form():
+            """Validate form inputs and return (is_valid, error_message)."""
+            student_id = id_entry.get().strip()
+            fname = fname_entry.get().strip()
+            lname = lname_entry.get().strip()
+            gender = gender_combo.get()
+            year = year_combo.get()
+            program = program_widget.get()
+            
+            # check empty fields
+            if not student_id:
+                return False, "Student ID is required"
+            if not fname:
+                return False, "First Name is required"
+            if not lname:
+                return False, "Last Name is required"
+            if not gender or gender == "Select Gender":
+                return False, "Gender must be selected"
+            if not year or year == "Select Year":
+                return False, "Year Level must be selected"
+            if not program:
+                return False, "Program must be selected"
+            
+            # check ID format: must be 202x-xxxx
+            import re
+            if not re.match(r'^202\d-\d{4}$', student_id):
+                return False, "Student ID must follow the format 202X-XXXX (e.g. 2024-0001)"
+            
+            # check for duplicate ID
+            if any(s['id'] == student_id for s in self.controller.students):
+                return False, "Student ID already exists"
+            
+            # check name format (only letters and spaces)
+            if not fname.replace(" ", "").isalpha():
+                return False, "First Name must contain only letters and spaces"
+            if not lname.replace(" ", "").isalpha():
+                return False, "Last Name must contain only letters and spaces"
+            
+            return True, ""
+        
+        def save():
+            is_valid, error_msg = validate_form()
+            if not is_valid:
+                self.controller.show_custom_dialog("Validation Error", error_msg, dialog_type="error")
+                return
+            
+            student_id = id_entry.get().strip()
+            fname = fname_entry.get().strip().title()  # capitalize
+            lname = lname_entry.get().strip().title()  # capitalize
+            gender = gender_combo.get()
+            year = year_combo.get()
+            program = program_widget.get()
+            
+            new_student = {
+                'id': student_id,
+                'firstname': fname,
+                'lastname': lname,
+                'gender': gender,
+                'year': year,
+                'program': program,
+            }
+            ok, msg = validate_student(new_student)
+            if not ok:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+            
+            success, msg = self.controller.add_student(new_student)
+            if not success:
+                self.controller.show_custom_dialog("Error", msg, dialog_type="error")
+                return
+            
+            self.refresh_table()
+            try:
+                self.refresh_sidebar()
+                self._refresh_all_sidebars()
+            except Exception:
+                pass
+            modal.destroy()
+            self.controller.show_custom_dialog("Success", "Student added successfully!")
+        
+        # button row: Save and Cancel
+        btn_row = ctk.CTkFrame(form_frame, fg_color="transparent")
+        btn_row.pack(fill="x", pady=(8,0))
+        ctk.CTkButton(btn_row, text="Save Student", command=save, height=CONTROL_HEIGHT_MD,
+               fg_color=ACCENT_COLOR, text_color=TEXT_PRIMARY, font=FONT_BOLD, corner_radius=RADIUS_SM, border_width=0).pack(side="left", fill="x", expand=True, padx=(0, 6))
+        ctk.CTkButton(btn_row, text="Cancel", command=modal.destroy, height=CONTROL_HEIGHT_MD,
+               fg_color=BTN_SEGMENT_FG, hover_color=BTN_SEGMENT_HOVER, text_color="white", font=FONT_BOLD, corner_radius=RADIUS_SM, border_width=0).pack(side="left", fill="x", expand=True, padx=(6, 0))
+
+        animate_toplevel_in(modal, x=x, y=y)
+
+
+StudentsListView = StudentsView
+
+__all__ = ["StudentsListView", "StudentsView"]
+
+
+
