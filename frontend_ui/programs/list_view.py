@@ -2,6 +2,7 @@
 import customtkinter as ctk
 import tkinter as tk
 import time
+import sys
 from tkinter import ttk, filedialog, messagebox
 
 # matplotlib & numpy are lazy-loaded inside create_donut_chart() to speed up startup
@@ -96,7 +97,7 @@ class ProgramsView(ctk.CTkFrame):
             border_color=BORDER_COLOR,
             height=62,
         )
-        footer.grid(row=2, column=0, sticky="ew", pady=(SPACE_MD, 0))
+        footer.grid(row=2, column=0, sticky="ew", padx=(0, 25), pady=(SPACE_MD, 0))
         footer.grid_propagate(False)
         footer.grid_columnconfigure(0, weight=0)
         footer.grid_columnconfigure(1, weight=1)
@@ -228,14 +229,111 @@ class ProgramsView(ctk.CTkFrame):
             except Exception:
                 bar.set(min(val / 50, 1.0))
 
-        dist_card = DepthCard(right_panel, fg_color=PANEL_COLOR, corner_radius=RADIUS_LG, border_width=0, border_color=BORDER_COLOR, height=332)
+        dist_card = DepthCard(right_panel, fg_color=PANEL_COLOR, corner_radius=RADIUS_LG, border_width=0, border_color=BORDER_COLOR, height=430)
         dist_card.pack(fill="x")
         dist_card.pack_propagate(False)
         ctk.CTkLabel(dist_card, text="COLLEGE PROGRAM DISTRIBUTION", font=get_font(12, True)).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_MD, SPACE_SM))
 
         self.create_donut_chart(dist_card)
         self.right_dist_card = dist_card
+
+        self._render_fun_fact_card(right_panel)
         self.refresh_table()
+
+    def _get_year_level_counts(self):
+        year_counts = {"1": 0, "2": 0, "3": 0, "4": 0}
+        for student in self.controller.students:
+            year_value = str(student.get("year", "")).strip()
+            if year_value and year_value[0] in year_counts:
+                year_counts[year_value[0]] += 1
+        return year_counts
+
+    @staticmethod
+    def _college_color(code: str, fallback: str):
+        mapping = {
+            "COE": "#800000",   # maroon
+            "CSM": "#D32F2F",   # red
+            "CHS": "#6EC6FF",   # light blue
+            "CCS": "#6EC6FF",   # light blue
+            "CEBA": "#F4D03F",  # yellow
+            "CED": "#F48FB1",   # pink
+        }
+        return mapping.get((code or "").strip().upper(), fallback)
+
+    def _render_fun_fact_card(self, parent):
+        self.fun_fact_card = DepthCard(
+            parent,
+            fg_color=PANEL_COLOR,
+            corner_radius=RADIUS_LG,
+            border_width=0,
+            border_color=BORDER_COLOR,
+            height=282,
+        )
+        self.fun_fact_card.pack(fill="x", pady=(SPACE_SM, 0))
+        self.fun_fact_card.pack_propagate(False)
+
+        ctk.CTkLabel(
+            self.fun_fact_card,
+            text="YEAR LEVEL COUNT",
+            font=get_font(12, True),
+            text_color=TEXT_MUTED,
+        ).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_MD, SPACE_XS))
+
+        year_counts = self._get_year_level_counts()
+        levels = [
+            ("1st Year", year_counts["1"]),
+            ("2nd Year", year_counts["2"]),
+            ("3rd Year", year_counts["3"]),
+            ("4th Year", year_counts["4"]),
+        ]
+        level_colors = [COLOR_PALETTE[i % len(COLOR_PALETTE)] for i in range(4)]
+        max_count = max(1, max(count for _, count in levels))
+
+        for i, (label, count) in enumerate(levels):
+            row = ctk.CTkFrame(self.fun_fact_card, fg_color="transparent")
+            row.pack(fill="x", padx=SPACE_LG, pady=4)
+            ctk.CTkLabel(row, text=label, font=get_font(13, True), text_color=TEXT_PRIMARY).pack(side="left")
+            ctk.CTkLabel(row, text=f"{count} Students", text_color=TEXT_MUTED).pack(side="right")
+
+            bar = ctk.CTkProgressBar(self.fun_fact_card, progress_color=level_colors[i], fg_color=ENTRY_BG, height=8)
+            bar.pack(fill="x", padx=SPACE_LG, pady=(0, 4))
+            bar.set(count / max_count)
+
+    def _draw_canvas_donut(self, chart_body, values, colors, total_programs):
+        canvas = tk.Canvas(chart_body, bg=PANEL_COLOR, highlightthickness=0, bd=0, height=230)
+        canvas.pack(fill="x", pady=(0, SPACE_SM))
+
+        cx, cy = 145, 112
+        outer_r = 82
+        inner_r = 48
+        start = 90.0
+        for count, color in zip(values, colors):
+            sweep = -360.0 * (count / total_programs)
+            canvas.create_arc(
+                cx - outer_r,
+                cy - outer_r,
+                cx + outer_r,
+                cy + outer_r,
+                start=start,
+                extent=sweep,
+                style=tk.PIESLICE,
+                fill=color,
+                outline=PANEL_COLOR,
+                width=1,
+            )
+            start += sweep
+
+        canvas.create_oval(
+            cx - inner_r,
+            cy - inner_r,
+            cx + inner_r,
+            cy + inner_r,
+            fill=PANEL_COLOR,
+            outline=PANEL_COLOR,
+        )
+        canvas.create_text(cx, cy - 4, text=str(total_programs), fill=TEXT_PRIMARY, font=(FONT_MAIN, 15, "bold"))
+        canvas.create_text(cx, cy + 16, text="Programs", fill=TEXT_MUTED, font=(FONT_MAIN, 9))
+        return True
 
     def _refresh_all_sidebars(self):
         try:
@@ -275,41 +373,63 @@ class ProgramsView(ctk.CTkFrame):
 
         labels = [code for code, _ in ranked]
         values = [count for _, count in ranked]
-        colors = [COLOR_PALETTE[i % len(COLOR_PALETTE)] for i, _code in enumerate(labels)]
+        colors = [
+            self._college_color(code, COLOR_PALETTE[i % len(COLOR_PALETTE)])
+            for i, code in enumerate(labels)
+        ]
 
-        try:
-            from matplotlib.figure import Figure
-            from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+        chart_rendered = False
 
-            fig = Figure(figsize=(2.45, 2.45), dpi=170)
-            fig.patch.set_facecolor(PANEL_COLOR)
-            ax = fig.add_subplot(111)
-            ax.set_facecolor(PANEL_COLOR)
-            ax.pie(
-                values,
-                colors=colors,
-                startangle=90,
-                wedgeprops={"width": 0.43, "edgecolor": PANEL_COLOR, "linewidth": 1.5},
-                normalize=True,
-            )
-            ax.text(0, 0.06, str(total_programs), ha="center", va="center", color=TEXT_PRIMARY, fontsize=16, fontweight="bold")
-            ax.text(0, -0.15, "Programs", ha="center", va="center", color=TEXT_MUTED, fontsize=9)
-            ax.set(aspect="equal")
-            ax.set_xticks([])
-            ax.set_yticks([])
-            fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
+        # In packaged exe mode, use Tk canvas directly for maximum backend reliability.
+        if getattr(sys, "frozen", False):
+            try:
+                chart_rendered = self._draw_canvas_donut(chart_body, values, colors, total_programs)
+            except Exception:
+                chart_rendered = False
+        else:
+            try:
+                from matplotlib.figure import Figure
+                from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
-            chart_canvas = FigureCanvasTkAgg(fig, master=chart_body)
-            chart_canvas.draw()
-            chart_widget = chart_canvas.get_tk_widget()
-            chart_widget.configure(highlightthickness=0, bd=0)
-            chart_widget.pack(pady=(0, SPACE_SM))
-        except Exception:
+                fig = Figure(figsize=(2.65, 2.65), dpi=220)
+                fig.patch.set_facecolor(PANEL_COLOR)
+                ax = fig.add_subplot(111)
+                ax.set_facecolor(PANEL_COLOR)
+                ax.pie(
+                    values,
+                    colors=colors,
+                    startangle=90,
+                    wedgeprops={"width": 0.43, "edgecolor": PANEL_COLOR, "linewidth": 1.5},
+                    normalize=True,
+                )
+                ax.text(0, 0.06, str(total_programs), ha="center", va="center", color=TEXT_PRIMARY, fontsize=16, fontweight="bold")
+                ax.text(0, -0.15, "Programs", ha="center", va="center", color=TEXT_MUTED, fontsize=9)
+                ax.set(aspect="equal")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                fig.subplots_adjust(left=0.01, right=0.99, top=0.99, bottom=0.01)
+
+                chart_canvas = FigureCanvasTkAgg(fig, master=chart_body)
+                chart_canvas.draw()
+                chart_canvas.draw_idle()
+                chart_widget = chart_canvas.get_tk_widget()
+                chart_widget.configure(highlightthickness=0, bd=0)
+                chart_widget.pack(fill="x", pady=(0, SPACE_SM))
+                chart_rendered = True
+            except Exception:
+                try:
+                    chart_rendered = self._draw_canvas_donut(chart_body, values, colors, total_programs)
+                except Exception:
+                    chart_rendered = False
+
+        if not chart_rendered:
             ctk.CTkLabel(chart_body, text="Chart unavailable", text_color=TEXT_MUTED).pack(pady=26)
+
+        if not chart_rendered:
             return
 
-        legend = ctk.CTkScrollableFrame(chart_body, fg_color="transparent", height=76)
-        legend.pack(fill="both", expand=True)
+        legend = ctk.CTkScrollableFrame(chart_body, fg_color="transparent", height=136)
+        legend.pack(fill="both", expand=True, pady=(0, SPACE_XS))
 
         for (college_code, count), color in zip(ranked, colors):
             row = ctk.CTkFrame(legend, fg_color="transparent")
@@ -384,6 +504,11 @@ class ProgramsView(ctk.CTkFrame):
             self.pagination.apply_theme_colors(tokens)
 
         setup_treeview_style()
+        if hasattr(self, "right_dist_card") and self.right_dist_card.winfo_exists():
+            try:
+                self.create_donut_chart(self.right_dist_card)
+            except Exception:
+                pass
         self.tree.tag_configure("odd", background=tokens.get("TABLE_ODD_BG", TABLE_ODD_BG))
         self.tree.tag_configure("even", background=tokens.get("TABLE_EVEN_BG", TABLE_EVEN_BG))
         self.tree.tag_configure(
@@ -533,11 +658,14 @@ class ProgramsView(ctk.CTkFrame):
             except Exception:
                 bar.set(min(val / 50, 1.0))
 
-        dist_card = DepthCard(self.right_panel, fg_color=PANEL_COLOR, corner_radius=RADIUS_LG, border_width=0, border_color=BORDER_COLOR, height=332)
+        dist_card = DepthCard(self.right_panel, fg_color=PANEL_COLOR, corner_radius=RADIUS_LG, border_width=0, border_color=BORDER_COLOR, height=430)
         dist_card.pack(fill="x")
         dist_card.pack_propagate(False)
         ctk.CTkLabel(dist_card, text="COLLEGE PROGRAM DISTRIBUTION", font=get_font(12, True)).pack(anchor="w", padx=SPACE_LG, pady=(SPACE_MD, SPACE_SM))
         self.create_donut_chart(dist_card)
+        self.right_dist_card = dist_card
+
+        self._render_fun_fact_card(self.right_panel)
 
     def _on_tree_motion(self, event):
         region = self.tree.identify_region(event.x, event.y)

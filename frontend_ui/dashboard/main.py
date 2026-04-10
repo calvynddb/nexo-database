@@ -160,6 +160,7 @@ class DashboardFrame(ctk.CTkFrame):
         logo_label = ctk.CTkLabel(left_section, image=logo_img, text="")
         logo_label.image = logo_img  # keep reference to avoid gc
         logo_label.grid(row=0, column=0, padx=(0, 12))
+        self.logo_label = logo_label
         self._logo_img = logo_img  # store as instance variable
         
         # "nexo." text - bigger and bolder, centered vertically
@@ -1236,6 +1237,9 @@ class DashboardFrame(ctk.CTkFrame):
         x = root.winfo_rootx() + (max(root.winfo_width(), width) - width) // 2
         y = root.winfo_rooty() + (max(root.winfo_height(), height) - height) // 2
         flash.geometry(f"{width}x{height}+{x}+{y}")
+        flash.transient(self)
+        flash.lift()
+        flash.focus_force()
 
         shell = DepthCard(
             flash,
@@ -1482,11 +1486,22 @@ class DashboardFrame(ctk.CTkFrame):
             text_color=text_primary,
         )
 
-        for btn in self.nav_btns.values():
+        for vc, btn in self.nav_btns.items():
             btn.configure(
                 text_color=text_primary,
                 border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
+                fg_color=tokens.get("ACCENT_COLOR", ACCENT_COLOR) if vc == self.current_view else tokens.get("BTN_SECONDARY_FG", BTN_SECONDARY_FG),
+                hover_color=tokens.get("BTN_PRIMARY_HOVER", BTN_PRIMARY_HOVER) if vc == self.current_view else tokens.get("BTN_SECONDARY_HOVER", BTN_SECONDARY_HOVER),
             )
+
+        if hasattr(self, "logo_label") and self.logo_label.winfo_exists():
+            try:
+                logo_img = get_main_logo(size=80)
+                self.logo_label.configure(image=logo_img)
+                self.logo_label.image = logo_img
+                self._logo_img = logo_img
+            except Exception:
+                pass
 
         self.update_button_states()
         self.update_auth_button()

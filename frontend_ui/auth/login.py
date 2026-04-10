@@ -17,6 +17,7 @@ from config import (
     BTN_PRIMARY_HOVER,
     SPACE_LG,
     SPACE_MD,
+    SPACE_SM,
     CONTROL_HEIGHT_LG,
     RADIUS_SM,
     RADIUS_MD,
@@ -46,7 +47,7 @@ class LoginFrame(ctk.CTkFrame):
             border_width=0,
             border_color=BORDER_COLOR,
             width=540,
-            height=520,
+            height=420,
         )
         card.grid(row=0, column=0, padx=SPACE_LG, pady=SPACE_LG)
         card.grid_propagate(False)
@@ -55,21 +56,21 @@ class LoginFrame(ctk.CTkFrame):
 
         # logo - extra large for prominent display
         logo_frame = ctk.CTkFrame(card, fg_color="transparent", corner_radius=0, border_width=0)
-        logo_frame.pack(pady=(SPACE_LG, SPACE_MD), padx=SPACE_LG)
-        
-        # load main logo - extra big
+        logo_frame.pack(pady=(SPACE_MD, SPACE_SM), padx=SPACE_LG)
+
         try:
-            self._logo_img = get_main_logo(size=138)
+            self._logo_img = get_main_logo(size=118)
             lbl = ctk.CTkLabel(logo_frame, image=self._logo_img, text="")
             lbl.image = self._logo_img
-            lbl.pack(padx=SPACE_LG, pady=SPACE_MD)
+            lbl.pack(padx=SPACE_LG, pady=SPACE_SM)
+            self.logo_label = lbl
         except Exception:
             ctk.CTkLabel(logo_frame, text="nexo", font=get_font(32, True), text_color=TITLE_COLOR).pack(padx=SPACE_LG, pady=SPACE_MD)
 
         self.title_label = ctk.CTkLabel(card, text="nexo", font=get_font(30, True), text_color=TITLE_COLOR)
-        self.title_label.pack(pady=(0, 8))
+        self.title_label.pack(pady=(0, 6))
         self.subtitle_label = ctk.CTkLabel(card, text="Administrative Access", font=get_font(12), text_color=TEXT_MUTED)
-        self.subtitle_label.pack(pady=(0, SPACE_LG))
+        self.subtitle_label.pack(pady=(0, SPACE_MD))
 
         self.proceed_button = ctk.CTkButton(
             card,
@@ -122,6 +123,14 @@ class LoginFrame(ctk.CTkFrame):
             text_color=text,
             border_color=tokens.get("BORDER_COLOR", BORDER_COLOR),
         )
+
+        if hasattr(self, "logo_label") and self.logo_label.winfo_exists():
+            try:
+                logo_img = get_main_logo(size=118)
+                self.logo_label.configure(image=logo_img)
+                self.logo_label.image = logo_img
+            except Exception:
+                pass
 
     def _on_destroy(self, event):
         if event.widget is self:

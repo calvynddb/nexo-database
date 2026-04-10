@@ -587,7 +587,7 @@ class StudentsView(ctk.CTkFrame):
         profile_window = ctk.CTkToplevel(self)
         profile_window.title(f"Student Profile: {student.get('firstname')} {student.get('lastname')}")
         apply_window_icon(profile_window)
-        profile_window.geometry("750x600")
+        profile_window.geometry("700x520")
         profile_window.configure(fg_color=BG_COLOR)
         profile_window.attributes('-topmost', True)
         profile_window.grab_set()

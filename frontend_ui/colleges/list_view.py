@@ -86,7 +86,7 @@ class CollegesView(ctk.CTkFrame):
             border_color=BORDER_COLOR,
             height=62,
         )
-        footer.grid(row=2, column=0, sticky="ew", pady=(SPACE_MD, 0))
+        footer.grid(row=2, column=0, sticky="ew", padx=(0, 25), pady=(SPACE_MD, 0))
         footer.grid_propagate(False)
         footer.grid_columnconfigure(0, weight=0)
         footer.grid_columnconfigure(1, weight=1)
@@ -182,36 +182,7 @@ class CollegesView(ctk.CTkFrame):
         right_panel.grid(row=1, column=1, sticky="nsew")
         self.right_panel = right_panel
         
-        ctk.CTkLabel(right_panel, text="DIRECTORY FACTS", font=get_font(12, True), text_color=TEXT_MUTED).pack(anchor="w", pady=(0, SPACE_SM))
-
-        # use icons like Students view and keep references to avoid GC
-        self._fact_img_students = get_icon("users", size=28, fallback_color=ACCENT_COLOR)
-        self._fact_img_programs = get_icon("books", size=28, fallback_color=COLOR_PALETTE[1 % len(COLOR_PALETTE)])
-        self._fact_img_colleges = get_icon("building", size=28, fallback_color=COLOR_PALETTE[2 % len(COLOR_PALETTE)])
-
-        total_students = str(len(self.controller.students))
-        total_programs = str(len(self.controller.programs))
-        total_colleges = str(len(self.controller.colleges))
-        avg_students_per_program = "0"
-        try:
-            avg_students_per_program = f"{len(self.controller.students) // max(len(self.controller.programs),1)}"
-        except Exception:
-            avg_students_per_program = "0"
-
-        # create stat cards matching Students view and remember them so we can size them evenly
-        from frontend_ui.ui import StatCard
-        self._sidebar_cards = []
-        c = StatCard(right_panel, self._fact_img_students, str(total_students), "TOTAL STUDENTS", height=120)
-        self._sidebar_cards.append(c)
-        c = StatCard(right_panel, self._fact_img_programs, str(total_programs), "TOTAL PROGRAMS", height=120)
-        self._sidebar_cards.append(c)
-        c = StatCard(right_panel, self._fact_img_colleges, str(total_colleges), "TOTAL COLLEGES", height=120)
-        self._sidebar_cards.append(c)
-        c = StatCard(right_panel, self._fact_img_students, str(avg_students_per_program), "AVG STUDENTS/PROGRAM", height=120)
-        self._sidebar_cards.append(c)
-
-        # defer a height update until after layout completes
-        self.after(50, self._update_sidebar_heights)
+        self.refresh_sidebar()
 
         # keep sidebar cards the same total height as the table by updating on resize
         def _on_table_config(e):
@@ -598,7 +569,7 @@ class CollegesView(ctk.CTkFrame):
         profile_window = ctk.CTkToplevel(self)
         profile_window.title(f"College: {college_code}")
         apply_window_icon(profile_window)
-        profile_window.geometry("750x550")
+        profile_window.geometry("700x520")
         profile_window.configure(fg_color=BG_COLOR)
         profile_window.attributes('-topmost', True)
         profile_window.grab_set()

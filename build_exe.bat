@@ -1,18 +1,32 @@
 @echo off
-REM Build a single-file, windowed executable using PyInstaller
-REM Bundles all source code, assets, SQLite data support, and dependencies.
-REM Uses Python 3.13 directly to avoid NumPy/matplotlib DLL incompatibilities with Python 3.14+
+REM Build a single-file, windowed executable using PyInstaller.
+REM Bundles source code, assets, SQLite support, and theme-specific logo assets.
+SETLOCAL ENABLEDELAYEDEXPANSION
 
-C:\Users\Calvyn\AppData\Local\Programs\Python\Python313\python.exe -m PyInstaller --noconfirm --onefile --windowed ^
+set PYTHON=C:\Users\Calvyn\AppData\Local\Programs\Python\Python313\python.exe
+if not exist "%PYTHON%" set PYTHON=%~dp0.venv\Scripts\python.exe
+if not exist "%PYTHON%" set PYTHON=python
+
+%PYTHON% -m pip install -r requirements.txt
+if errorlevel 1 (
+    echo Failed to install requirements for build environment.
+    pause
+    exit /b 1
+)
+
+%PYTHON% -m PyInstaller --noconfirm --onefile --windowed ^
     --icon "assets/nexo.ico" ^
     --add-data "assets;assets" ^
     --add-data "config.py;." ^
+    --add-data "nexo.db;." ^
     --add-data "backend;backend" ^
     --add-data "frontend_ui;frontend_ui" ^
+    --hidden-import "sqlalchemy" ^
     --hidden-import "PIL" ^
     --hidden-import "PIL._tkinter_finder" ^
     --hidden-import "numpy" ^
     --hidden-import "customtkinter" ^
+    --collect-all "sqlalchemy" ^
     --collect-all "customtkinter" ^
     --collect-all "matplotlib" ^
     --exclude-module "PyQt5" ^

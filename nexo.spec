@@ -1,9 +1,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('assets', 'assets'), ('config.py', '.'), ('backend', 'backend'), ('frontend_ui', 'frontend_ui')]
+datas = [('assets', 'assets'), ('config.py', '.'), ('nexo.db', '.'), ('backend', 'backend'), ('frontend_ui', 'frontend_ui')]
 binaries = []
-hiddenimports = ['PIL', 'PIL._tkinter_finder', 'numpy', 'customtkinter']
+hiddenimports = ['sqlalchemy', 'PIL', 'PIL._tkinter_finder', 'numpy', 'customtkinter']
+tmp_ret = collect_all('sqlalchemy')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('customtkinter')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('matplotlib')

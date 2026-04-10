@@ -531,28 +531,43 @@ def get_icon(name: str, size: int = 36, fallback_color: str | None = None):
     return placeholder_image(size=size, color=fallback_color)
 
 
-def get_main_logo(size: int = 56):
-    """Load the main logo from assets/Main Logo.png.
+def get_main_logo(size: int = 56, preset: int | None = None):
+    """Load the main logo from assets, choosing a theme-aware variant when available.
     
     Args:
         size: Size to scale the logo to in pixels
+        preset: Theme preset index to select a matching logo.
     
     Returns:
         CTkImage
     """
-    logo_path = Path(resource_path("assets/Main Logo.png"))
-    
+    from config import THEME_MANAGER
+
+    if preset is None:
+        preset = THEME_MANAGER.get_current_preset()
+
+    themed_logo_names = {
+        0: "Main Logo.png",
+        1: "Main Logo Blue.png",
+        2: "Main Logo Orange.png",
+        3: "Main Logo Pink.png",
+    }
+    logo_name = themed_logo_names.get(int(preset), "Main Logo.png")
+    logo_path = Path(resource_path(f"assets/{logo_name}"))
+
+    if not logo_path.exists():
+        logo_path = Path(resource_path("assets/Main Logo.png"))
+
     if logo_path.exists():
         try:
             from PIL import Image
             pil = Image.open(logo_path)
-            # resize to requested size, maintaining aspect ratio
             pil.thumbnail((size, size), Image.Resampling.LANCZOS)
             img = ctk.CTkImage(light_image=pil, size=(size, size))
             return img
         except Exception as e:
             print(f"Error loading logo {logo_path}: {e}")
-    
+
     # fallback to user icon if logo not found
     return get_icon("user", size=size)
 

@@ -29,7 +29,7 @@ The app is fully SQLite-backed through SQLAlchemy.
 
 Key features:
 
-- Streamlined access flow with a single Proceed as Administrator entry action
+- Streamlined access flow with a single Proceed as Administrator entry action (no saved login credentials required)
 - Theme management with Light/Dark mode plus 4 accent presets (Purple, Blue, Orange, Pink)
 - Theme preference persistence across app restarts
 - CRUDL for Students, Programs, Colleges
